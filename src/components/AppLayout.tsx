@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Users, ShieldCheck, LogOut } from "lucide-react";
+import { Home, Users, ShieldCheck, LogOut, FileText } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/store/auth";
 import { PERMISSIONS, type PermissionKey } from "@/lib/permissions";
@@ -12,10 +12,17 @@ type NavItem = {
 	label: string;
 	icon: typeof Home;
 	requires?: PermissionKey;
+	requiresAny?: PermissionKey[];
 };
 
 const NAV: NavItem[] = [
 	{ to: "/", label: "Dashboard", icon: Home },
+	{
+		to: "/posts",
+		label: "Posts",
+		icon: FileText,
+		requiresAny: [PERMISSIONS.POST_WRITE_OWN, PERMISSIONS.POST_WRITE_ANY, PERMISSIONS.POST_REVIEW],
+	},
 	{ to: "/users", label: "Users", icon: Users, requires: PERMISSIONS.USER_MANAGE },
 	{ to: "/roles", label: "Roles", icon: ShieldCheck, requires: PERMISSIONS.ROLE_MANAGE },
 ];
@@ -42,9 +49,14 @@ function LayoutInner({ children }: { children: ReactNode }) {
 				</div>
 
 				<nav className="flex-1 space-y-1 p-2">
-					{NAV.filter((n) => !n.requires || user.permissions.includes(n.requires)).map((n) => {
+					{NAV.filter((n) => {
+						if (n.requires && !user.permissions.includes(n.requires)) return false;
+						if (n.requiresAny && !n.requiresAny.some((p) => user.permissions.includes(p)))
+							return false;
+						return true;
+					}).map((n) => {
 						const Icon = n.icon;
-						const active = pathname === n.to;
+						const active = pathname === n.to || (n.to !== "/" && pathname.startsWith(n.to));
 						return (
 							<Link
 								key={n.to}

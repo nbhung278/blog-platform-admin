@@ -6,6 +6,9 @@ import UsersPage from "./users";
 import RolesPage from "./roles";
 import SetupPage from "./setup";
 import ChangePasswordPage from "./change-password";
+import PostsPage from "./posts";
+import { PostNewPage, PostEditPage } from "./post-editor";
+import PostPreviewPage from "./post-preview";
 
 const rootRoute = createRootRoute({
 	component: App,
@@ -47,6 +50,30 @@ const changePasswordRoute = createRoute({
 	component: ChangePasswordPage,
 });
 
+const postsRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/posts",
+	component: PostsPage,
+});
+
+const postNewRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/posts/new",
+	component: PostNewPage,
+});
+
+const postEditRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/posts/$id/edit",
+	component: PostEditPage,
+});
+
+const postPreviewRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/posts/$id/preview",
+	component: PostPreviewPage,
+});
+
 export const routeTree = rootRoute.addChildren([
 	indexRoute,
 	loginRoute,
@@ -54,4 +81,8 @@ export const routeTree = rootRoute.addChildren([
 	changePasswordRoute,
 	usersRoute,
 	rolesRoute,
+	postsRoute,
+	postNewRoute,
+	postEditRoute,
+	postPreviewRoute,
 ]);

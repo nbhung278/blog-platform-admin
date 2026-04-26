@@ -40,3 +40,83 @@
 		color: var(--color-foreground);
 	}
 }
+
+/* Tiptap editor content. We don't ship @tailwindcss/typography in the admin, so
+   define just the bits the editor needs. */
+.tiptap {
+	line-height: 1.7;
+}
+.tiptap > * + * {
+	margin-top: 0.75em;
+}
+.tiptap h1 {
+	font-size: 1.875rem;
+	font-weight: 700;
+	margin-top: 1.5em;
+}
+.tiptap h2 {
+	font-size: 1.5rem;
+	font-weight: 600;
+	margin-top: 1.25em;
+}
+.tiptap h3 {
+	font-size: 1.25rem;
+	font-weight: 600;
+	margin-top: 1em;
+}
+.tiptap p {
+	margin: 0;
+}
+.tiptap ul,
+.tiptap ol {
+	padding-left: 1.5rem;
+}
+.tiptap ul {
+	list-style: disc;
+}
+.tiptap ol {
+	list-style: decimal;
+}
+.tiptap blockquote {
+	border-left: 3px solid var(--color-border);
+	padding-left: 1rem;
+	color: var(--color-muted-foreground);
+}
+.tiptap code {
+	background: var(--color-muted);
+	padding: 0.125rem 0.25rem;
+	border-radius: 0.25rem;
+	font-size: 0.875em;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.tiptap pre {
+	background: hsl(222 47% 11%);
+	color: hsl(210 40% 98%);
+	padding: 1rem;
+	border-radius: 0.5rem;
+	overflow-x: auto;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 0.875em;
+}
+.tiptap pre code {
+	background: transparent;
+	padding: 0;
+	color: inherit;
+}
+.tiptap a {
+	color: hsl(220 80% 50%);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.tiptap img {
+	max-width: 100%;
+	height: auto;
+	border-radius: 0.5rem;
+}
+.tiptap p.is-editor-empty:first-child::before {
+	content: attr(data-placeholder);
+	color: var(--color-muted-foreground);
+	float: left;
+	height: 0;
+	pointer-events: none;
+}
