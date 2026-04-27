@@ -50,6 +50,22 @@ export const usersApi = {
 
 export type PostStatus = "draft" | "pending" | "published" | "rejected";
 
+export type CategorySummary = {
+	id: string;
+	name: string;
+	slug: string;
+};
+
+export type Category = {
+	id: string;
+	name: string;
+	slug: string;
+	description: string | null;
+	postCount: number;
+	createdAt: string;
+	updatedAt: string;
+};
+
 export type PostListRow = {
 	id: string;
 	title: string;
@@ -66,6 +82,7 @@ export type PostListRow = {
 	createdAt: string;
 	updatedAt: string;
 	user: { id: string; name: string; username: string; avatarUrl: string | null };
+	categories: { category: CategorySummary }[];
 };
 
 export type PostFull = PostListRow & {
@@ -85,18 +102,48 @@ export type PostInput = {
 	tags?: string[];
 	metaTitle?: string;
 	metaDesc?: string;
+	categoryIds: string[];
+};
+
+export type PostsPage = {
+	data: PostListRow[];
+	total: number;
+	page: number;
+	limit: number;
 };
 
 export const postsApi = {
-	list: (scope: "mine" | "all" = "mine", status?: PostStatus) =>
+	list: (
+		scope: "mine" | "all" = "mine",
+		filters?: {
+			status?: PostStatus;
+			categoryId?: string;
+			q?: string;
+			page?: number;
+			limit?: number;
+		},
+	) =>
 		api
-			.get<PostListRow[]>("/api/posts", { params: { scope, ...(status ? { status } : {}) } })
+			.get<PostsPage>("/api/posts", {
+				params: { scope, ...filters },
+			})
 			.then((r) => r.data),
 	getById: (id: string) => api.get<PostFull>(`/api/posts/id/${id}`).then((r) => r.data),
 	create: (data: PostInput) => api.post<PostFull>("/api/posts", data).then((r) => r.data),
 	update: (id: string, data: Partial<PostInput> & { version: number }) =>
 		api.patch<PostFull>(`/api/posts/${id}`, data).then((r) => r.data),
 	remove: (id: string) => api.delete(`/api/posts/${id}`).then((r) => r.data),
+	bulkRemove: (ids: string[]) =>
+		api.post<{ deleted: number }>("/api/posts/bulk-delete", { ids }).then((r) => r.data),
+};
+
+export const categoriesApi = {
+	list: () => api.get<Category[]>("/api/categories").then((r) => r.data),
+	create: (data: { name: string; description?: string }) =>
+		api.post<Category>("/api/categories", data).then((r) => r.data),
+	update: (id: string, data: { name?: string; description?: string }) =>
+		api.patch<Category>(`/api/categories/${id}`, data).then((r) => r.data),
+	remove: (id: string) => api.delete(`/api/categories/${id}`).then((r) => r.data),
 };
 
 export const uploadsApi = {

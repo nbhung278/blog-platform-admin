@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef } from "react";
 import { ArrowLeft, Eye, Save, Send, Upload, X } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
@@ -11,7 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PostEditor } from "@/components/editor/PostEditor";
-import { postsApi, uploadsApi, type PostStatus } from "@/lib/queries";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { postsApi, categoriesApi, uploadsApi, type PostStatus } from "@/lib/queries";
 import { htmlToMarkdown } from "@/lib/markdown";
 import { PERMISSIONS, POST_WRITE_PERMISSIONS } from "@/lib/permissions";
 import { useAuth } from "@/store/auth";
@@ -72,8 +73,14 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 	const [contentHtml, setContentHtml] = useState("");
 	const [status, setStatus] = useState<PostStatus>("draft");
 	const [version, setVersion] = useState<number>(1);
+	const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
 	const [uploading, setUploading] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+
+	const categoriesQuery = useQuery({
+		queryKey: ["categories"],
+		queryFn: () => categoriesApi.list(),
+	});
 
 	async function handleCoverFileChange(e: React.ChangeEvent<HTMLInputElement>) {
 		const file = e.target.files?.[0];
@@ -100,6 +107,7 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 			setContentHtml(p.contentHtml);
 			setStatus(p.status);
 			setVersion(p.version);
+			setSelectedCategoryIds(p.categories.map((c) => c.category.id));
 		}
 	}, [mode, postQuery.data]);
 
@@ -116,6 +124,7 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 					.split(",")
 					.map((t) => t.trim())
 					.filter(Boolean),
+				categoryIds: selectedCategoryIds,
 			};
 			if (mode === "new") {
 				return postsApi.create(payload);
@@ -126,6 +135,7 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 			toast.success(mode === "new" ? "Post created" : "Post saved");
 			qc.invalidateQueries({ queryKey: ["posts"] });
 			qc.invalidateQueries({ queryKey: ["post", saved.id] });
+			qc.invalidateQueries({ queryKey: ["categories"] });
 			if (mode === "new") {
 				navigate({ to: "/posts/$id/edit", params: { id: saved.id } });
 			} else {
@@ -160,6 +170,7 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 	const canEditThisPost = isOwner || me.permissions.includes(PERMISSIONS.POST_WRITE_ANY);
 
 	const titleInvalid = title.trim().length === 0;
+	const categoryInvalid = selectedCategoryIds.length === 0;
 	const submitting = saveMut.isPending;
 
 	function onSave() {
@@ -215,7 +226,7 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 					<Button
 						variant="outline"
 						onClick={onSave}
-						disabled={submitting || titleInvalid || !canEditThisPost}
+						disabled={submitting || titleInvalid || categoryInvalid || !canEditThisPost}
 					>
 						<Save className="h-4 w-4" />
 						Save draft
@@ -224,7 +235,7 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 					{!canPublish && (
 						<Button
 							onClick={onSubmitForReview}
-							disabled={submitting || titleInvalid || !canEditThisPost}
+							disabled={submitting || titleInvalid || categoryInvalid || !canEditThisPost}
 						>
 							<Send className="h-4 w-4" />
 							Submit for review
@@ -238,7 +249,10 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 									Reject
 								</Button>
 							)}
-							<Button onClick={onPublish} disabled={submitting || titleInvalid || !canEditThisPost}>
+							<Button
+								onClick={onPublish}
+								disabled={submitting || titleInvalid || categoryInvalid || !canEditThisPost}
+							>
 								<Send className="h-4 w-4" />
 								{status === "published" ? "Update published" : "Publish"}
 							</Button>
@@ -279,12 +293,11 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 						<CardContent className="space-y-3">
 							<div className="space-y-1.5">
 								<Label htmlFor="excerpt">Excerpt</Label>
-								<textarea
+								<Textarea
 									id="excerpt"
 									value={excerpt}
 									onChange={(e) => setExcerpt(e.target.value)}
 									rows={3}
-									className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring w-full rounded-md border px-3 py-2 text-sm shadow-sm focus-visible:ring-1 focus-visible:outline-none"
 									placeholder="Short summary shown in feed"
 								/>
 							</div>
@@ -340,6 +353,35 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 									onChange={(e) => setTagsInput(e.target.value)}
 									placeholder="rust, databases"
 								/>
+							</div>
+							<div className="space-y-1.5">
+								<Label>
+									Categories <span className="text-destructive">*</span>
+								</Label>
+								{categoriesQuery.isLoading && (
+									<p className="text-muted-foreground text-xs">Loading…</p>
+								)}
+								{categoriesQuery.data && categoriesQuery.data.length === 0 && (
+									<p className="text-muted-foreground text-xs">No categories yet.</p>
+								)}
+								<div className="max-h-40 space-y-1.5 overflow-y-auto">
+									{categoriesQuery.data?.map((cat) => (
+										<label key={cat.id} className="flex cursor-pointer items-center gap-2 text-sm">
+											<Checkbox
+												checked={selectedCategoryIds.includes(cat.id)}
+												onCheckedChange={(checked) =>
+													setSelectedCategoryIds((prev) =>
+														checked ? [...prev, cat.id] : prev.filter((id) => id !== cat.id),
+													)
+												}
+											/>
+											{cat.name}
+										</label>
+									))}
+								</div>
+								{categoryInvalid && (
+									<p className="text-destructive text-xs">Select at least one category.</p>
+								)}
 							</div>
 						</CardContent>
 					</Card>

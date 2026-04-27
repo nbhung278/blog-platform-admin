@@ -1,23 +1,32 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Trash2, Eye } from "lucide-react";
+import {
+	useReactTable,
+	getCoreRowModel,
+	type ColumnDef,
+	type PaginationState,
+	type RowSelectionState,
+} from "@tanstack/react-table";
+import { Pencil, Plus, Trash2, Eye, Search, X } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { DataTable } from "@/components/ui/data-table";
 import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { postsApi, type PostListRow, type PostStatus } from "@/lib/queries";
+import { postsApi, categoriesApi, type PostListRow, type PostStatus } from "@/lib/queries";
 import { useAuth } from "@/store/auth";
 import { PERMISSIONS, POST_WRITE_PERMISSIONS } from "@/lib/permissions";
 
@@ -46,27 +55,207 @@ function PostsContent() {
 		me.permissions.includes(PERMISSIONS.POST_REVIEW);
 
 	const [tab, setTab] = useState<"mine" | "all">("mine");
-	const scope = tab;
+	const [search, setSearch] = useState("");
+	const [categoryId, setCategoryId] = useState("");
+	const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
+	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
 	const qc = useQueryClient();
+
+	const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: categoriesApi.list });
+
 	const postsQuery = useQuery({
-		queryKey: ["posts", scope],
-		queryFn: () => postsApi.list(scope),
-		// Pick up freshly flushed view counts (and Redis pending) without manual reload.
+		queryKey: ["posts", tab, search, categoryId, pagination.pageIndex, pagination.pageSize],
+		queryFn: () =>
+			postsApi.list(tab, {
+				q: search || undefined,
+				categoryId: categoryId || undefined,
+				page: pagination.pageIndex + 1,
+				limit: pagination.pageSize,
+			}),
 		refetchInterval: 30_000,
 	});
 
+	const rows = postsQuery.data?.data ?? [];
+	const total = postsQuery.data?.total ?? 0;
+
 	const [deleting, setDeleting] = useState<PostListRow | null>(null);
+	const [bulkDeleting, setBulkDeleting] = useState(false);
+
 	const removeMut = useMutation({
 		mutationFn: postsApi.remove,
 		onSuccess: () => {
 			toast.success("Post deleted");
 			qc.invalidateQueries({ queryKey: ["posts"] });
+			qc.invalidateQueries({ queryKey: ["categories"] });
 			setDeleting(null);
 		},
 		onError: (err: { response?: { data?: { error?: string } } }) =>
 			toast.error(err.response?.data?.error ?? "Delete failed"),
 	});
+
+	const bulkRemoveMut = useMutation({
+		mutationFn: postsApi.bulkRemove,
+		onSuccess: (data) => {
+			toast.success(`${data.deleted} post${data.deleted > 1 ? "s" : ""} deleted`);
+			qc.invalidateQueries({ queryKey: ["posts"] });
+			qc.invalidateQueries({ queryKey: ["categories"] });
+			setRowSelection({});
+			setBulkDeleting(false);
+		},
+		onError: (err: { response?: { data?: { error?: string } } }) => {
+			toast.error(err.response?.data?.error ?? "Bulk delete failed");
+			setBulkDeleting(false);
+		},
+	});
+
+	const canDeleteAny = me.permissions.includes(PERMISSIONS.POST_DELETE_ANY);
+	const canDeleteOwn = me.permissions.includes(PERMISSIONS.POST_DELETE_OWN);
+
+	const columns = useMemo<ColumnDef<PostListRow>[]>(
+		() => [
+			{
+				id: "select",
+				size: 40,
+				header: ({ table }) => (
+					<Checkbox
+						checked={
+							table.getIsAllPageRowsSelected() ||
+							(table.getIsSomePageRowsSelected() ? "indeterminate" : false)
+						}
+						onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
+						aria-label="Select all"
+					/>
+				),
+				cell: ({ row }) => (
+					<Checkbox
+						checked={row.getIsSelected()}
+						onCheckedChange={(v) => row.toggleSelected(!!v)}
+						aria-label="Select row"
+					/>
+				),
+				enableSorting: false,
+			},
+			{
+				accessorKey: "title",
+				header: "Title",
+				cell: ({ row }) => {
+					const p = row.original;
+					return (
+						<div className="font-medium">
+							<div>{p.title}</div>
+							{p.categories.length > 0 && (
+								<div className="mt-0.5 flex flex-wrap gap-1">
+									{p.categories.map((c) => (
+										<Badge key={c.category.id} variant="outline" className="text-[10px]">
+											{c.category.name}
+										</Badge>
+									))}
+								</div>
+							)}
+						</div>
+					);
+				},
+			},
+			...(tab === "all"
+				? [
+						{
+							id: "author",
+							header: "Author",
+							size: 140,
+							cell: ({ row }: { row: { original: PostListRow } }) => (
+								<span className="text-muted-foreground">@{row.original.user.username}</span>
+							),
+						} satisfies ColumnDef<PostListRow>,
+					]
+				: []),
+			{
+				accessorKey: "status",
+				header: "Status",
+				size: 110,
+				cell: ({ row }) => (
+					<Badge variant={STATUS_VARIANT[row.original.status]}>{row.original.status}</Badge>
+				),
+			},
+			{
+				accessorKey: "viewCount",
+				header: () => <div className="text-right">Views</div>,
+				size: 80,
+				cell: ({ row }) => <div className="text-right tabular-nums">{row.original.viewCount}</div>,
+			},
+			{
+				accessorKey: "updatedAt",
+				header: "Updated",
+				size: 160,
+				cell: ({ row }) => (
+					<span className="text-muted-foreground text-xs">
+						{new Date(row.original.updatedAt).toLocaleString()}
+					</span>
+				),
+			},
+			{
+				id: "actions",
+				header: () => <div className="text-right">Actions</div>,
+				size: 140,
+				cell: ({ row }) => {
+					const p = row.original;
+					const isOwner = p.user.id === me.id;
+					const canDelete = canDeleteAny || (isOwner && canDeleteOwn);
+					return (
+						<div className="text-right">
+							<Button asChild variant="ghost" size="icon" title="Preview">
+								<Link to="/posts/$id/preview" params={{ id: p.id }} target="_blank">
+									<Eye className="h-4 w-4" />
+								</Link>
+							</Button>
+							<Button asChild variant="ghost" size="icon" title="Edit">
+								<Link to="/posts/$id/edit" params={{ id: p.id }}>
+									<Pencil className="h-4 w-4" />
+								</Link>
+							</Button>
+							<Button
+								variant="ghost"
+								size="icon"
+								title="Delete"
+								disabled={!canDelete}
+								onClick={() => setDeleting(p)}
+							>
+								<Trash2 className="text-destructive h-4 w-4" />
+							</Button>
+						</div>
+					);
+				},
+			},
+		],
+		[tab, me.id, canDeleteAny, canDeleteOwn],
+	);
+
+	const table = useReactTable({
+		data: rows,
+		columns,
+		rowCount: total,
+		pageCount: Math.max(1, Math.ceil(total / pagination.pageSize)),
+		state: { pagination, rowSelection },
+		onPaginationChange: (updater) => {
+			setPagination(updater);
+			setRowSelection({});
+		},
+		onRowSelectionChange: setRowSelection,
+		getCoreRowModel: getCoreRowModel(),
+		manualPagination: true,
+		getRowId: (row) => row.id,
+	});
+
+	const selectedIds = Object.keys(rowSelection);
+
+	function resetFilters() {
+		setSearch("");
+		setCategoryId("");
+		setPagination((p) => ({ ...p, pageIndex: 0 }));
+		setRowSelection({});
+	}
+
+	const hasFilters = search !== "" || categoryId !== "";
 
 	return (
 		<div className="space-y-4">
@@ -83,7 +272,67 @@ function PostsContent() {
 				)}
 			</div>
 
-			<Tabs value={tab} onValueChange={(v) => setTab(v as "mine" | "all")}>
+			<div className="flex flex-wrap items-center gap-2">
+				<div className="relative">
+					<Search className="text-muted-foreground absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
+					<Input
+						value={search}
+						onChange={(e) => {
+							setSearch(e.target.value);
+							setPagination((p) => ({ ...p, pageIndex: 0 }));
+							setRowSelection({});
+						}}
+						placeholder="Search title..."
+						className="h-9 w-56 pl-8"
+					/>
+				</div>
+
+				<Select
+					value={categoryId || "__all__"}
+					onValueChange={(val) => {
+						setCategoryId(val === "__all__" ? "" : val);
+						setPagination((p) => ({ ...p, pageIndex: 0 }));
+						setRowSelection({});
+					}}
+				>
+					<SelectTrigger className="h-9 w-44">
+						<SelectValue placeholder="All categories" />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="__all__">All categories</SelectItem>
+						{categoriesQuery.data?.map((cat) => (
+							<SelectItem key={cat.id} value={cat.id}>
+								{cat.name}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+
+				{hasFilters && (
+					<Button variant="ghost" size="sm" onClick={resetFilters}>
+						<X className="h-3.5 w-3.5" />
+						Clear
+					</Button>
+				)}
+
+				{selectedIds.length > 0 && (
+					<div className="ml-auto flex items-center gap-2">
+						<Button variant="destructive" size="sm" onClick={() => setBulkDeleting(true)}>
+							<Trash2 className="h-4 w-4" />
+							Delete {selectedIds.length} selected
+						</Button>
+					</div>
+				)}
+			</div>
+
+			<Tabs
+				value={tab}
+				onValueChange={(v) => {
+					setTab(v as "mine" | "all");
+					setPagination((p) => ({ ...p, pageIndex: 0 }));
+					setRowSelection({});
+				}}
+			>
 				<TabsList>
 					<TabsTrigger value="mine">My posts</TabsTrigger>
 					{canSeeAll && <TabsTrigger value="all">All posts</TabsTrigger>}
@@ -91,12 +340,11 @@ function PostsContent() {
 				<TabsContent value={tab}>
 					<Card>
 						<CardContent className="pt-6">
-							<PostsTable
+							<DataTable
+								table={table}
+								columns={columns}
 								loading={postsQuery.isLoading}
-								rows={postsQuery.data ?? []}
-								onDelete={setDeleting}
-								showAuthor={tab === "all"}
-								meId={me.id}
+								emptyText="No posts found."
 							/>
 						</CardContent>
 					</Card>
@@ -119,95 +367,17 @@ function PostsContent() {
 				loading={removeMut.isPending}
 				onConfirm={() => deleting && removeMut.mutate(deleting.id)}
 			/>
+
+			<ConfirmDialog
+				open={bulkDeleting}
+				onOpenChange={(o) => !o && setBulkDeleting(false)}
+				title={`Delete ${selectedIds.length} post${selectedIds.length > 1 ? "s" : ""}?`}
+				description="This permanently deletes all selected posts. This cannot be undone."
+				confirmLabel="Delete all"
+				destructive
+				loading={bulkRemoveMut.isPending}
+				onConfirm={() => bulkRemoveMut.mutate(selectedIds)}
+			/>
 		</div>
-	);
-}
-
-function PostsTable({
-	loading,
-	rows,
-	onDelete,
-	showAuthor,
-	meId,
-}: {
-	loading: boolean;
-	rows: PostListRow[];
-	onDelete: (p: PostListRow) => void;
-	showAuthor: boolean;
-	meId: string;
-}) {
-	const me = useAuth((s) => s.user)!;
-	const canDeleteAny = me.permissions.includes(PERMISSIONS.POST_DELETE_ANY);
-	const canDeleteOwn = me.permissions.includes(PERMISSIONS.POST_DELETE_OWN);
-
-	return (
-		<Table>
-			<TableHeader>
-				<TableRow>
-					<TableHead>Title</TableHead>
-					{showAuthor && <TableHead>Author</TableHead>}
-					<TableHead className="w-[110px]">Status</TableHead>
-					<TableHead className="w-[80px] text-right">Views</TableHead>
-					<TableHead className="w-[160px]">Updated</TableHead>
-					<TableHead className="w-[140px] text-right">Actions</TableHead>
-				</TableRow>
-			</TableHeader>
-			<TableBody>
-				{loading && (
-					<TableRow>
-						<TableCell colSpan={showAuthor ? 6 : 5} className="text-muted-foreground text-center">
-							Loading...
-						</TableCell>
-					</TableRow>
-				)}
-				{!loading && rows.length === 0 && (
-					<TableRow>
-						<TableCell colSpan={showAuthor ? 6 : 5} className="text-muted-foreground text-center">
-							No posts yet.
-						</TableCell>
-					</TableRow>
-				)}
-				{rows.map((p) => {
-					const isOwner = p.user.id === meId;
-					const canDelete = canDeleteAny || (isOwner && canDeleteOwn);
-					return (
-						<TableRow key={p.id}>
-							<TableCell className="font-medium">{p.title}</TableCell>
-							{showAuthor && (
-								<TableCell className="text-muted-foreground">@{p.user.username}</TableCell>
-							)}
-							<TableCell>
-								<Badge variant={STATUS_VARIANT[p.status]}>{p.status}</Badge>
-							</TableCell>
-							<TableCell className="text-right tabular-nums">{p.viewCount}</TableCell>
-							<TableCell className="text-muted-foreground text-xs">
-								{new Date(p.updatedAt).toLocaleString()}
-							</TableCell>
-							<TableCell className="text-right">
-								<Button asChild variant="ghost" size="icon" title="Preview">
-									<Link to="/posts/$id/preview" params={{ id: p.id }} target="_blank">
-										<Eye className="h-4 w-4" />
-									</Link>
-								</Button>
-								<Button asChild variant="ghost" size="icon" title="Edit">
-									<Link to="/posts/$id/edit" params={{ id: p.id }}>
-										<Pencil className="h-4 w-4" />
-									</Link>
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									title="Delete"
-									disabled={!canDelete}
-									onClick={() => onDelete(p)}
-								>
-									<Trash2 className="text-destructive h-4 w-4" />
-								</Button>
-							</TableCell>
-						</TableRow>
-					);
-				})}
-			</TableBody>
-		</Table>
 	);
 }

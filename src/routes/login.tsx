@@ -3,6 +3,9 @@ import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/store/auth";
 import { ADMIN_PANEL_PERMISSIONS } from "@/lib/permissions";
 import { api } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 
 export default function LoginPage() {
@@ -57,37 +60,33 @@ export default function LoginPage() {
 				<p className="mt-1 text-sm text-gray-500">Sign in to manage the platform.</p>
 
 				<div className="mt-6 space-y-4">
-					<div>
-						<label className="block text-sm font-medium text-gray-700">Email</label>
-						<input
+					<div className="space-y-1.5">
+						<Label htmlFor="email">Email</Label>
+						<Input
+							id="email"
 							type="email"
 							required
 							value={email}
 							onChange={(e) => setEmail(e.target.value)}
-							className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
 						/>
 					</div>
-					<div>
-						<label className="block text-sm font-medium text-gray-700">Password</label>
+					<div className="space-y-1.5">
+						<Label htmlFor="password">Password</Label>
 						<PasswordInput
+							id="password"
 							required
 							autoComplete="current-password"
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}
-							className="mt-1"
 						/>
 					</div>
 				</div>
 
 				{error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-				<button
-					type="submit"
-					disabled={loading}
-					className="mt-6 w-full rounded-md bg-gray-900 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-				>
+				<Button type="submit" disabled={loading} className="mt-6 w-full">
 					{loading ? "Signing in..." : "Sign in"}
-				</button>
+				</Button>
 			</form>
 		</div>
 	);

@@ -9,6 +9,7 @@ import ChangePasswordPage from "./change-password";
 import PostsPage from "./posts";
 import { PostNewPage, PostEditPage } from "./post-editor";
 import PostPreviewPage from "./post-preview";
+import CategoriesPage from "./categories";
 
 const rootRoute = createRootRoute({
 	component: App,
@@ -74,6 +75,12 @@ const postPreviewRoute = createRoute({
 	component: PostPreviewPage,
 });
 
+const categoriesRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/categories",
+	component: CategoriesPage,
+});
+
 export const routeTree = rootRoute.addChildren([
 	indexRoute,
 	loginRoute,
@@ -85,4 +92,5 @@ export const routeTree = rootRoute.addChildren([
 	postNewRoute,
 	postEditRoute,
 	postPreviewRoute,
+	categoriesRoute,
 ]);

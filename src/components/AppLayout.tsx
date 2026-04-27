@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Home, Users, ShieldCheck, LogOut, FileText } from "lucide-react";
+import { Home, Users, ShieldCheck, LogOut, FileText, Tag } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/store/auth";
 import { PERMISSIONS, type PermissionKey } from "@/lib/permissions";
@@ -23,6 +23,12 @@ const NAV: NavItem[] = [
 		label: "Posts",
 		icon: FileText,
 		requiresAny: [PERMISSIONS.POST_WRITE_OWN, PERMISSIONS.POST_WRITE_ANY, PERMISSIONS.POST_REVIEW],
+	},
+	{
+		to: "/categories",
+		label: "Categories",
+		icon: Tag,
+		requiresAny: [PERMISSIONS.ROLE_MANAGE, PERMISSIONS.POST_WRITE_ANY],
 	},
 	{ to: "/users", label: "Users", icon: Users, requires: PERMISSIONS.USER_MANAGE },
 	{ to: "/roles", label: "Roles", icon: ShieldCheck, requires: PERMISSIONS.ROLE_MANAGE },
