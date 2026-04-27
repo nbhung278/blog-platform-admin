@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
+import DOMPurify from "isomorphic-dompurify";
 import { useAuth } from "@/store/auth";
 import { postsApi } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
@@ -80,9 +81,7 @@ export default function PostPreviewPage() {
 
 				<div
 					className="tiptap"
-					// Content originates from our authenticated, permission-gated Tiptap editor.
-					// In a public-facing render path, sanitize with DOMPurify before injection.
-					dangerouslySetInnerHTML={{ __html: p.contentHtml }}
+					dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(p.contentHtml) }}
 				/>
 			</article>
 		</div>

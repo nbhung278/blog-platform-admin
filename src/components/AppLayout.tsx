@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { Home, Users, ShieldCheck, LogOut, FileText } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/store/auth";
@@ -37,8 +38,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
 function LayoutInner({ children }: { children: ReactNode }) {
 	const user = useAuth((s) => s.user)!;
-	const logout = useAuth((s) => s.logout);
+	const logoutStore = useAuth((s) => s.logout);
+	const queryClient = useQueryClient();
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+	function logout() {
+		logoutStore();
+		queryClient.clear();
+	}
 
 	return (
 		<div className="flex min-h-screen">

@@ -32,6 +32,14 @@ type Props = {
 
 export function PostEditor({ value, onChange, placeholder }: Props) {
 	const uploadingRef = useRef(false);
+	const mountedRef = useRef(true);
+
+	useEffect(() => {
+		mountedRef.current = true;
+		return () => {
+			mountedRef.current = false;
+		};
+	}, []);
 
 	const editor = useEditor({
 		extensions: [
@@ -116,7 +124,8 @@ export function PostEditor({ value, onChange, placeholder }: Props) {
 		input.accept = "image/jpeg,image/png,image/webp,image/gif";
 		input.onchange = () => {
 			const file = input.files?.[0];
-			if (file) void uploadAndInsert(file);
+			if (file && mountedRef.current) void uploadAndInsert(file);
+			input.onchange = null;
 		};
 		input.click();
 	}
@@ -128,6 +137,12 @@ export function PostEditor({ value, onChange, placeholder }: Props) {
 		if (url === null) return;
 		if (url === "") {
 			editor.chain().focus().extendMarkRange("link").unsetLink().run();
+			return;
+		}
+		try {
+			const parsed = new URL(url);
+			if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return;
+		} catch {
 			return;
 		}
 		editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
