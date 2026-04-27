@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Eye, Save, Send } from "lucide-react";
+import { useRef } from "react";
+import { ArrowLeft, Eye, Save, Send, Upload, X } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PostEditor } from "@/components/editor/PostEditor";
-import { postsApi, type PostStatus } from "@/lib/queries";
+import { postsApi, uploadsApi, type PostStatus } from "@/lib/queries";
 import { htmlToMarkdown } from "@/lib/markdown";
 import { PERMISSIONS, POST_WRITE_PERMISSIONS } from "@/lib/permissions";
 import { useAuth } from "@/store/auth";
@@ -71,6 +72,23 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 	const [contentHtml, setContentHtml] = useState("");
 	const [status, setStatus] = useState<PostStatus>("draft");
 	const [version, setVersion] = useState<number>(1);
+	const [uploading, setUploading] = useState(false);
+	const fileInputRef = useRef<HTMLInputElement>(null);
+
+	async function handleCoverFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+		const file = e.target.files?.[0];
+		if (!file) return;
+		setUploading(true);
+		try {
+			const { url } = await uploadsApi.uploadImage(file);
+			setCoverUrl(url);
+		} catch {
+			toast.error("Image upload failed");
+		} finally {
+			setUploading(false);
+			if (fileInputRef.current) fileInputRef.current.value = "";
+		}
+	}
 
 	useEffect(() => {
 		if (mode === "edit" && postQuery.data) {
@@ -271,12 +289,47 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 								/>
 							</div>
 							<div className="space-y-1.5">
-								<Label htmlFor="cover">Cover image URL</Label>
-								<Input
-									id="cover"
-									value={coverUrl}
-									onChange={(e) => setCoverUrl(e.target.value)}
-									placeholder="https://..."
+								<Label>Cover image</Label>
+								{coverUrl && (
+									<div className="relative">
+										<img
+											src={coverUrl}
+											alt="Cover preview"
+											className="aspect-video w-full rounded object-cover"
+										/>
+										<button
+											type="button"
+											onClick={() => setCoverUrl("")}
+											className="absolute top-1 right-1 rounded bg-black/50 p-1 text-white hover:bg-black/70"
+										>
+											<X className="h-3 w-3" />
+										</button>
+									</div>
+								)}
+								<div className="flex gap-2">
+									<Input
+										value={coverUrl}
+										onChange={(e) => setCoverUrl(e.target.value)}
+										placeholder="https://..."
+										className="flex-1"
+									/>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										disabled={uploading}
+										onClick={() => fileInputRef.current?.click()}
+									>
+										<Upload className="h-4 w-4" />
+										{uploading ? "Uploading…" : "Upload"}
+									</Button>
+								</div>
+								<input
+									ref={fileInputRef}
+									type="file"
+									accept="image/jpeg,image/png,image/webp,image/gif"
+									className="hidden"
+									onChange={handleCoverFileChange}
 								/>
 							</div>
 							<div className="space-y-1.5">
