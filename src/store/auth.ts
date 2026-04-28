@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { api } from "@/lib/api";
+import { AxiosError } from "axios";
+import { api, invalidateCsrfCache, registerOnAuthLost } from "@/lib/api";
 import type { PermissionKey } from "@/lib/permissions";
 
 export type AdminUser = {
@@ -23,7 +24,7 @@ type AuthState = {
 		name: string;
 		username: string;
 	}) => Promise<void>;
-	logout: () => void;
+	logout: () => Promise<void>;
 	loadMe: () => Promise<void>;
 	hasPermission: (perm: PermissionKey) => boolean;
 	hasAnyPermission: (perms: PermissionKey[]) => boolean;
@@ -38,7 +39,7 @@ export const useAuth = create<AuthState>((set, get) => ({
 		set({ loading: true });
 		try {
 			const { data } = await api.post("/api/auth/login", { email, password });
-			localStorage.setItem("admin_token", data.token);
+			invalidateCsrfCache();
 			set({ user: data.user, initialized: true });
 		} finally {
 			set({ loading: false });
@@ -49,30 +50,43 @@ export const useAuth = create<AuthState>((set, get) => ({
 		set({ loading: true });
 		try {
 			const res = await api.post("/api/auth/setup", data);
-			localStorage.setItem("admin_token", res.data.token);
+			invalidateCsrfCache();
 			set({ user: res.data.user, initialized: true });
 		} finally {
 			set({ loading: false });
 		}
 	},
 
-	logout() {
-		localStorage.removeItem("admin_token");
+	async logout() {
+		try {
+			await api.post("/api/auth/logout");
+		} catch {
+			// best-effort: backend will eventually evict refresh token by TTL
+		}
+		invalidateCsrfCache();
 		set({ user: null });
 	},
 
 	async loadMe() {
-		const token = localStorage.getItem("admin_token");
-		if (!token) {
-			set({ initialized: true });
-			return;
-		}
+		set({ loading: true });
 		try {
 			const { data } = await api.get("/api/auth/me");
 			set({ user: data, initialized: true });
-		} catch {
-			localStorage.removeItem("admin_token");
-			set({ user: null, initialized: true });
+		} catch (err) {
+			// Only treat an authoritative 401 (after the interceptor's refresh
+			// attempt has also failed) as "logged out". Network errors, 5xx,
+			// CORS failures etc. should leave `user` untouched so a transient
+			// outage doesn't kick the user back to /login on every page load.
+			const status = err instanceof AxiosError ? err.response?.status : undefined;
+			if (status === 401) {
+				set({ user: null, initialized: true });
+			} else {
+				// Mark initialized so RequireAuth can render its loading/error
+				// state, but keep whatever `user` we already have.
+				set({ initialized: true });
+			}
+		} finally {
+			set({ loading: false });
 		}
 	},
 
@@ -86,3 +100,11 @@ export const useAuth = create<AuthState>((set, get) => ({
 		return perms.some((p) => user.permissions.includes(p));
 	},
 }));
+
+// Wire the api interceptor's "auth lost" hook into the store. When the
+// auto-refresh interceptor confirms we can't recover the session, clear user
+// state immediately so the UI stops showing protected content.
+registerOnAuthLost(() => {
+	invalidateCsrfCache();
+	useAuth.setState({ user: null, initialized: true });
+});

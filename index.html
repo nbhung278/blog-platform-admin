@@ -3,6 +3,18 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="referrer" content="no-referrer" />
+		<meta http-equiv="X-Content-Type-Options" content="nosniff" />
+		<!--
+			Baseline CSP shipped via meta. For production, set the *real* CSP at
+			the reverse proxy / static host so it can include frame-ancestors
+			(meta cannot). connect-src must include the backend origin — adjust
+			when deploying to a different domain.
+		-->
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' http://localhost:3000 ws://localhost:* https:; object-src 'none'; base-uri 'self'; form-action 'self'"
+		/>
 		<title>Blog Platform Admin</title>
 	</head>
 	<body>

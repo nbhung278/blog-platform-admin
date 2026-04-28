@@ -40,7 +40,7 @@ export default function LoginPage() {
 			}
 			const allowed = user?.permissions.some((p) => ADMIN_PANEL_PERMISSIONS.includes(p));
 			if (!allowed) {
-				useAuth.getState().logout();
+				await useAuth.getState().logout();
 				setError("Your account does not have admin access.");
 				return;
 			}

@@ -48,8 +48,8 @@ function LayoutInner({ children }: { children: ReactNode }) {
 	const queryClient = useQueryClient();
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-	function logout() {
-		logoutStore();
+	async function logout() {
+		await logoutStore();
 		queryClient.clear();
 	}
 
