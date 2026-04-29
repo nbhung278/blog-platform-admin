@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,7 +36,6 @@ export default function UsersPage() {
 	return (
 		<AppLayout>
 			<UsersContent />
-			<Toaster richColors position="top-right" />
 		</AppLayout>
 	);
 }
@@ -117,12 +116,20 @@ function UsersContent() {
 										</div>
 									</TableCell>
 									<TableCell className="text-right">
-										<Button variant="ghost" size="icon" onClick={() => setEditing(u)}>
+										<Button
+											variant="ghost"
+											size="icon"
+											aria-label="Edit user"
+											title="Edit user"
+											onClick={() => setEditing(u)}
+										>
 											<Pencil className="h-4 w-4" />
 										</Button>
 										<Button
 											variant="ghost"
 											size="icon"
+											aria-label="Delete user"
+											title="Delete user"
 											disabled={u.id === me.id}
 											onClick={() => setDeleting(u)}
 										>

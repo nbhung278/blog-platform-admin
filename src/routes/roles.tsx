@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock, Pencil, Plus, Trash2 } from "lucide-react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +32,6 @@ export default function RolesPage() {
 	return (
 		<AppLayout>
 			<RolesContent />
-			<Toaster richColors position="top-right" />
 		</AppLayout>
 	);
 }
@@ -130,12 +129,20 @@ function RolesContent() {
 									</TableCell>
 									<TableCell>{r.userCount}</TableCell>
 									<TableCell className="text-right">
-										<Button variant="ghost" size="icon" onClick={() => setEditing(r)}>
+										<Button
+											variant="ghost"
+											size="icon"
+											aria-label="Edit role"
+											title="Edit role"
+											onClick={() => setEditing(r)}
+										>
 											<Pencil className="h-4 w-4" />
 										</Button>
 										<Button
 											variant="ghost"
 											size="icon"
+											aria-label="Delete role"
+											title="Delete role"
 											disabled={r.isSystem}
 											onClick={() => setDeleting(r)}
 										>

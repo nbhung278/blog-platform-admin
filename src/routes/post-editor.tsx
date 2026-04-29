@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Eye, Save, Send, Upload, X } from "lucide-react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +37,6 @@ export function PostNewPage() {
 	return (
 		<AppLayout>
 			<EditorScreen mode="new" />
-			<Toaster richColors position="top-right" />
 		</AppLayout>
 	);
 }
@@ -47,7 +46,6 @@ export function PostEditPage() {
 	return (
 		<AppLayout>
 			<EditorScreen mode="edit" postId={id} />
-			<Toaster richColors position="top-right" />
 		</AppLayout>
 	);
 }
@@ -194,7 +192,13 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 		<div className="space-y-4">
 			<div className="flex items-center justify-between gap-3">
 				<div className="flex items-center gap-3">
-					<Button variant="ghost" size="icon" onClick={() => navigate({ to: "/posts" })}>
+					<Button
+						variant="ghost"
+						size="icon"
+						aria-label="Back to posts"
+						title="Back to posts"
+						onClick={() => navigate({ to: "/posts" })}
+					>
 						<ArrowLeft className="h-4 w-4" />
 					</Button>
 					<div>

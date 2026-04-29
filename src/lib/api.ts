@@ -1,13 +1,13 @@
 import axios, { type AxiosError, type AxiosRequestConfig } from "axios";
+import { APP_HEADER, APP_KIND_ADMIN, CSRF_COOKIE_NAME, CSRF_HEADER } from "./authConstants";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-const CSRF_COOKIE = "admin_csrf";
-const CSRF_HEADER = "X-CSRF-Token";
 
 export const api = axios.create({
 	baseURL: API_URL,
 	timeout: 30_000,
 	withCredentials: true,
+	headers: { [APP_HEADER]: APP_KIND_ADMIN },
 });
 
 // Cache the last-seen CSRF cookie so we don't re-parse document.cookie on every
@@ -22,7 +22,7 @@ function readCookie(name: string): string | null {
 
 function getCsrf(): string | null {
 	if (csrfCache) return csrfCache;
-	csrfCache = readCookie(CSRF_COOKIE);
+	csrfCache = readCookie(CSRF_COOKIE_NAME);
 	return csrfCache;
 }
 
@@ -58,7 +58,11 @@ export function registerOnAuthLost(cb: () => void) {
 
 async function performRefresh(): Promise<boolean> {
 	try {
-		await axios.post(`${API_URL}/api/auth/refresh`, {}, { withCredentials: true });
+		await axios.post(
+			`${API_URL}/api/auth/refresh`,
+			{},
+			{ withCredentials: true, headers: { [APP_HEADER]: APP_KIND_ADMIN } },
+		);
 		// New cookies arrived — drop cached CSRF so the next unsafe request
 		// re-reads the rotated value.
 		invalidateCsrfCache();

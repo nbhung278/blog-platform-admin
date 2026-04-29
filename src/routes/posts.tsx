@@ -8,8 +8,8 @@ import {
 	type PaginationState,
 	type RowSelectionState,
 } from "@tanstack/react-table";
-import { Pencil, Plus, Trash2, Eye, Search, X } from "lucide-react";
-import { toast, Toaster } from "sonner";
+import { Pencil, Plus, Trash2, Eye, Search, X, Check, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,7 +41,6 @@ export default function PostsPage() {
 	return (
 		<AppLayout>
 			<PostsContent />
-			<Toaster richColors position="top-right" />
 		</AppLayout>
 	);
 }
@@ -53,8 +52,12 @@ function PostsContent() {
 	const canSeeAll =
 		me.permissions.includes(PERMISSIONS.POST_WRITE_ANY) ||
 		me.permissions.includes(PERMISSIONS.POST_REVIEW);
+	const canReview =
+		me.permissions.includes(PERMISSIONS.POST_REVIEW) ||
+		me.permissions.includes(PERMISSIONS.POST_PUBLISH_ANY);
+	const canPublish = me.permissions.includes(PERMISSIONS.POST_PUBLISH_ANY);
 
-	const [tab, setTab] = useState<"mine" | "all">("mine");
+	const [tab, setTab] = useState<"mine" | "all" | "review">("all");
 	const [search, setSearch] = useState("");
 	const [categoryId, setCategoryId] = useState("");
 	const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
@@ -67,13 +70,30 @@ function PostsContent() {
 	const postsQuery = useQuery({
 		queryKey: ["posts", tab, search, categoryId, pagination.pageIndex, pagination.pageSize],
 		queryFn: () =>
-			postsApi.list(tab, {
+			postsApi.list(tab === "review" ? "all" : tab, {
 				q: search || undefined,
 				categoryId: categoryId || undefined,
+				status: tab === "review" ? "pending" : undefined,
 				page: pagination.pageIndex + 1,
 				limit: pagination.pageSize,
 			}),
 		refetchInterval: 30_000,
+	});
+
+	const reviewMut = useMutation({
+		mutationFn: (vars: { id: string; version: number; status: PostStatus }) =>
+			postsApi.update(vars.id, { version: vars.version, status: vars.status }),
+		onSuccess: (_data, vars) => {
+			toast.success(vars.status === "published" ? "Post approved & published" : "Post rejected");
+			qc.invalidateQueries({ queryKey: ["posts"] });
+		},
+		onError: (err: { response?: { data?: { error?: string }; status?: number } }) => {
+			if (err.response?.status === 409) {
+				toast.error("Conflict: post was modified — refresh and retry");
+				return;
+			}
+			toast.error(err.response?.data?.error ?? "Action failed");
+		},
 	});
 
 	const rows = postsQuery.data?.data ?? [];
@@ -111,6 +131,104 @@ function PostsContent() {
 
 	const canDeleteAny = me.permissions.includes(PERMISSIONS.POST_DELETE_ANY);
 	const canDeleteOwn = me.permissions.includes(PERMISSIONS.POST_DELETE_OWN);
+
+	const reviewColumns = useMemo<ColumnDef<PostListRow>[]>(
+		() => [
+			{
+				accessorKey: "title",
+				header: "Title",
+				cell: ({ row }) => {
+					const p = row.original;
+					return (
+						<div className="font-medium">
+							<div>{p.title}</div>
+							{p.categories.length > 0 && (
+								<div className="mt-0.5 flex flex-wrap gap-1">
+									{p.categories.map((c) => (
+										<Badge key={c.category.id} variant="outline" className="text-[10px]">
+											{c.category.name}
+										</Badge>
+									))}
+								</div>
+							)}
+						</div>
+					);
+				},
+			},
+			{
+				id: "author",
+				header: "Author",
+				size: 160,
+				cell: ({ row }) => (
+					<span className="text-muted-foreground">@{row.original.user.username}</span>
+				),
+			},
+			{
+				accessorKey: "updatedAt",
+				header: "Submitted",
+				size: 160,
+				cell: ({ row }) => (
+					<span className="text-muted-foreground text-xs">
+						{new Date(row.original.updatedAt).toLocaleString()}
+					</span>
+				),
+			},
+			{
+				id: "actions",
+				header: () => <div className="text-right">Review</div>,
+				size: 220,
+				cell: ({ row }) => {
+					const p = row.original;
+					const inFlight = reviewMut.isPending && reviewMut.variables?.id === p.id;
+					return (
+						<div className="flex justify-end gap-1.5">
+							<Button asChild variant="ghost" size="icon" title="Preview">
+								<Link to="/posts/$id/preview" params={{ id: p.id }} target="_blank">
+									<Eye className="h-4 w-4" />
+								</Link>
+							</Button>
+							<Button asChild variant="ghost" size="icon" title="Open in editor">
+								<Link to="/posts/$id/edit" params={{ id: p.id }}>
+									<Pencil className="h-4 w-4" />
+								</Link>
+							</Button>
+							{canPublish && (
+								<>
+									<Button
+										variant="ghost"
+										size="icon"
+										disabled={inFlight}
+										title="Reject"
+										aria-label="Reject"
+										className="text-red-600 hover:bg-red-50 hover:text-red-700"
+										onClick={() =>
+											reviewMut.mutate({ id: p.id, version: p.version, status: "rejected" })
+										}
+									>
+										<XCircle className="h-4 w-4" />
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon"
+										disabled={inFlight}
+										title="Approve"
+										aria-label="Approve"
+										className="text-green-600 hover:bg-green-50 hover:text-green-700"
+										onClick={() =>
+											reviewMut.mutate({ id: p.id, version: p.version, status: "published" })
+										}
+									>
+										<Check className="h-4 w-4" />
+									</Button>
+								</>
+							)}
+						</div>
+					);
+				},
+			},
+		],
+		[canPublish, reviewMut],
+	);
 
 	const columns = useMemo<ColumnDef<PostListRow>[]>(
 		() => [
@@ -230,12 +348,13 @@ function PostsContent() {
 		[tab, me.id, canDeleteAny, canDeleteOwn],
 	);
 
+	const activeColumns = tab === "review" ? reviewColumns : columns;
 	const table = useReactTable({
 		data: rows,
-		columns,
+		columns: activeColumns,
 		rowCount: total,
 		pageCount: Math.max(1, Math.ceil(total / pagination.pageSize)),
-		state: { pagination, rowSelection },
+		state: { pagination, rowSelection: tab === "review" ? {} : rowSelection },
 		onPaginationChange: (updater) => {
 			setPagination(updater);
 			setRowSelection({});
@@ -328,23 +447,24 @@ function PostsContent() {
 			<Tabs
 				value={tab}
 				onValueChange={(v) => {
-					setTab(v as "mine" | "all");
+					setTab(v as "mine" | "all" | "review");
 					setPagination((p) => ({ ...p, pageIndex: 0 }));
 					setRowSelection({});
 				}}
 			>
 				<TabsList>
-					<TabsTrigger value="mine">My posts</TabsTrigger>
 					{canSeeAll && <TabsTrigger value="all">All posts</TabsTrigger>}
+					<TabsTrigger value="mine">My posts</TabsTrigger>
+					{canReview && <TabsTrigger value="review">Pending review</TabsTrigger>}
 				</TabsList>
 				<TabsContent value={tab}>
 					<Card>
 						<CardContent className="pt-6">
 							<DataTable
 								table={table}
-								columns={columns}
+								columns={activeColumns}
 								loading={postsQuery.isLoading}
-								emptyText="No posts found."
+								emptyText={tab === "review" ? "No posts waiting for review." : "No posts found."}
 							/>
 						</CardContent>
 					</Card>

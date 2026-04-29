@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { AxiosError } from "axios";
 import { api, invalidateCsrfCache, registerOnAuthLost } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 import type { PermissionKey } from "@/lib/permissions";
 
 export type AdminUser = {
@@ -40,6 +41,7 @@ export const useAuth = create<AuthState>((set, get) => ({
 		try {
 			const { data } = await api.post("/api/auth/login", { email, password });
 			invalidateCsrfCache();
+			queryClient.clear();
 			set({ user: data.user, initialized: true });
 		} finally {
 			set({ loading: false });
@@ -51,6 +53,7 @@ export const useAuth = create<AuthState>((set, get) => ({
 		try {
 			const res = await api.post("/api/auth/setup", data);
 			invalidateCsrfCache();
+			queryClient.clear();
 			set({ user: res.data.user, initialized: true });
 		} finally {
 			set({ loading: false });
@@ -64,6 +67,7 @@ export const useAuth = create<AuthState>((set, get) => ({
 			// best-effort: backend will eventually evict refresh token by TTL
 		}
 		invalidateCsrfCache();
+		queryClient.clear();
 		set({ user: null });
 	},
 
@@ -106,5 +110,6 @@ export const useAuth = create<AuthState>((set, get) => ({
 // state immediately so the UI stops showing protected content.
 registerOnAuthLost(() => {
 	invalidateCsrfCache();
+	queryClient.clear();
 	useAuth.setState({ user: null, initialized: true });
 });

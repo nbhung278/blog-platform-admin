@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +30,6 @@ export default function CategoriesPage() {
 	return (
 		<AppLayout>
 			<CategoriesContent />
-			<Toaster richColors position="top-right" />
 		</AppLayout>
 	);
 }
@@ -108,17 +107,24 @@ function CategoriesContent() {
 									</TableCell>
 									<TableCell className="text-right tabular-nums">{cat.postCount}</TableCell>
 									<TableCell className="text-right">
-										<Button variant="ghost" size="icon" onClick={() => setEditing(cat)}>
+										<Button
+											variant="ghost"
+											size="icon"
+											aria-label="Edit category"
+											title="Edit category"
+											onClick={() => setEditing(cat)}
+										>
 											<Pencil className="h-4 w-4" />
 										</Button>
 										<Button
 											variant="ghost"
 											size="icon"
 											disabled={cat.postCount > 0}
+											aria-label="Delete category"
 											title={
 												cat.postCount > 0
 													? `Cannot delete: ${cat.postCount} post(s) assigned`
-													: "Delete"
+													: "Delete category"
 											}
 											onClick={() => setDeleting(cat)}
 										>
