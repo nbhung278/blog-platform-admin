@@ -111,12 +111,29 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 
 	const saveMut = useMutation({
 		mutationFn: async (nextStatus: PostStatus) => {
+			// External URL → rehost onto our S3 so the backend allowlist accepts it.
+			// Backend short-circuits when the URL is already on-host, so this is
+			// safe to call unconditionally. Tag the error so onError can show a
+			// rehost-specific message instead of the generic "Save failed".
+			let finalCoverUrl = coverUrl.trim() || null;
+			if (finalCoverUrl) {
+				try {
+					const { url } = await uploadsApi.uploadFromUrl(finalCoverUrl);
+					finalCoverUrl = url;
+					if (url !== coverUrl.trim()) setCoverUrl(url);
+				} catch (err: unknown) {
+					const apiErr = err as { response?: { data?: { error?: unknown } } };
+					const detail = formatApiError(apiErr.response?.data?.error) ?? "Could not fetch image";
+					throw new Error(`Cover image: ${detail}`);
+				}
+			}
+
 			const payload = {
 				title: title.trim(),
 				contentHtml,
 				contentMd: htmlToMarkdown(contentHtml),
 				excerpt: excerpt.trim() || undefined,
-				coverUrl: coverUrl.trim() || null,
+				coverUrl: finalCoverUrl,
 				status: nextStatus,
 				tags: tagsInput
 					.split(",")
@@ -141,12 +158,12 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 				setStatus(saved.status);
 			}
 		},
-		onError: (err: { response?: { data?: { error?: unknown }; status?: number } }) => {
+		onError: (err: Error & { response?: { data?: { error?: unknown }; status?: number } }) => {
 			if (err.response?.status === 409) {
 				toast.error("Conflict: post was modified elsewhere. Reload to get latest.");
 				return;
 			}
-			toast.error(formatApiError(err.response?.data?.error) ?? "Save failed");
+			toast.error(formatApiError(err.response?.data?.error) ?? err.message ?? "Save failed");
 		},
 	});
 

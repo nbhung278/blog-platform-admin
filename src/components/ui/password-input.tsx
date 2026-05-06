@@ -3,16 +3,16 @@ import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "./input";
 
-export const PasswordInput = React.forwardRef<
-	HTMLInputElement,
-	Omit<React.InputHTMLAttributes<HTMLInputElement>, "type">
->(({ className, autoComplete = "new-password", ...props }, ref) => {
+function PasswordInput({
+	className,
+	autoComplete = "new-password",
+	...props
+}: Omit<React.ComponentProps<"input">, "type">) {
 	const [visible, setVisible] = React.useState(false);
 
 	return (
 		<div className="relative">
 			<Input
-				ref={ref}
 				type={visible ? "text" : "password"}
 				autoComplete={autoComplete}
 				data-1p-ignore
@@ -26,11 +26,12 @@ export const PasswordInput = React.forwardRef<
 				tabIndex={-1}
 				onClick={() => setVisible((v) => !v)}
 				aria-label={visible ? "Hide password" : "Show password"}
-				className="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-1 transition-colors focus-visible:ring-1 focus-visible:outline-none"
+				className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 focus-visible:border-ring absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-1 transition-colors outline-none focus-visible:ring-[3px]"
 			>
-				{visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+				{visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
 			</button>
 		</div>
 	);
-});
-PasswordInput.displayName = "PasswordInput";
+}
+
+export { PasswordInput };

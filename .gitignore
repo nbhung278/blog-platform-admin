@@ -14,3 +14,7 @@ coverage/
 # Note: bun.lock (text format) is committed for reproducible installs.
 # Old binary lockfile is ignored:
 bun.lockb
+
+# Claude Code skill cache & lockfile (per-machine, not source).
+.agents/
+skills-lock.json
