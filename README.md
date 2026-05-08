@@ -24,7 +24,7 @@ The moderation/operations SPA for the Strix blog platform. Lets staff manage use
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) ≥ 1.0
+- [Bun](https://bun.sh/) ≥ 1.2
 - Backend running and reachable
 
 ## Setup
@@ -94,7 +94,12 @@ src/
 ## Deploying
 
 - `bun run build` → static site in `dist/`
+- Hosted on AWS S3 + CloudFront (see `../scripts/DEPLOY.md`)
+- `./scripts/deploy-admin.sh` handles build + S3 sync + CloudFront invalidation
 - Same SPA-fallback rules as the public client
 - `VITE_API_URL` baked in at build time — must point at the production API origin
 - Backend must include the deployed admin URL in `ADMIN_URL` so CORS + WebSocket origin checks pass
-- Behind a reverse proxy, terminate TLS and forward to Vite-built static assets
+
+## Roadmap
+
+See `ROADMAP.md` for performance/UX improvements applied across the platform — most done as of 2026-05-08.
