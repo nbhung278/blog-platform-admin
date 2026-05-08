@@ -17,6 +17,9 @@ import { htmlToMarkdown } from "@/lib/markdown";
 import { PERMISSIONS, POST_WRITE_PERMISSIONS } from "@/lib/permissions";
 import { useAuth } from "@/store/auth";
 
+// Mirrors the backend cap in posts.ts; keep them in sync.
+const MAX_CATEGORIES = 3;
+
 // API errors come in two shapes: plain string ({ error: "Forbidden" }) or
 // Zod's ZodError object ({ error: { name, issues: [{ path, message }] } }).
 function formatApiError(err: unknown): string | null {
@@ -185,7 +188,8 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 	const canEditThisPost = isOwner || me.permissions.includes(PERMISSIONS.POST_WRITE_ANY);
 
 	const titleInvalid = title.trim().length === 0;
-	const categoryInvalid = selectedCategoryIds.length === 0;
+	const categoryInvalid =
+		selectedCategoryIds.length === 0 || selectedCategoryIds.length > MAX_CATEGORIES;
 	const submitting = saveMut.isPending;
 
 	function onSave() {
@@ -376,9 +380,15 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 								/>
 							</div>
 							<div className="space-y-1.5">
-								<Label>
-									Categories <span className="text-destructive">*</span>
-								</Label>
+								<div className="flex items-baseline justify-between gap-2">
+									<Label>
+										Categories <span className="text-destructive">*</span>
+									</Label>
+									<span className="text-muted-foreground text-xs">
+										{selectedCategoryIds.length}/{MAX_CATEGORIES}
+									</span>
+								</div>
+								<p className="text-muted-foreground text-xs">Pick up to {MAX_CATEGORIES}.</p>
 								{categoriesQuery.isLoading && (
 									<p className="text-muted-foreground text-xs">Loading…</p>
 								)}
@@ -386,22 +396,38 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 									<p className="text-muted-foreground text-xs">No categories yet.</p>
 								)}
 								<div className="max-h-40 space-y-1.5 overflow-y-auto">
-									{categoriesQuery.data?.map((cat) => (
-										<label key={cat.id} className="flex cursor-pointer items-center gap-2 text-sm">
-											<Checkbox
-												checked={selectedCategoryIds.includes(cat.id)}
-												onCheckedChange={(checked) =>
-													setSelectedCategoryIds((prev) =>
-														checked ? [...prev, cat.id] : prev.filter((id) => id !== cat.id),
-													)
-												}
-											/>
-											{cat.name}
-										</label>
-									))}
+									{categoriesQuery.data?.map((cat) => {
+										const checked = selectedCategoryIds.includes(cat.id);
+										const atLimit = selectedCategoryIds.length >= MAX_CATEGORIES;
+										const disabled = !checked && atLimit;
+										return (
+											<label
+												key={cat.id}
+												className={`flex items-center gap-2 text-sm ${
+													disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+												}`}
+											>
+												<Checkbox
+													checked={checked}
+													disabled={disabled}
+													onCheckedChange={(next) =>
+														setSelectedCategoryIds((prev) =>
+															next ? [...prev, cat.id] : prev.filter((id) => id !== cat.id),
+														)
+													}
+												/>
+												{cat.name}
+											</label>
+										);
+									})}
 								</div>
-								{categoryInvalid && (
+								{selectedCategoryIds.length === 0 && (
 									<p className="text-destructive text-xs">Select at least one category.</p>
+								)}
+								{selectedCategoryIds.length > MAX_CATEGORIES && (
+									<p className="text-destructive text-xs">
+										Select at most {MAX_CATEGORIES} categories.
+									</p>
 								)}
 							</div>
 						</CardContent>
