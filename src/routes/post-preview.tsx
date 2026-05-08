@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import DOMPurify from "isomorphic-dompurify";
 import { useAuth } from "@/store/auth";
 import { postsApi } from "@/lib/queries";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { Badge } from "@/components/ui/badge";
 
 export default function PostPreviewPage() {
@@ -11,6 +11,7 @@ export default function PostPreviewPage() {
 	const initialized = useAuth((s) => s.initialized);
 	const user = useAuth((s) => s.user);
 	const loadMe = useAuth((s) => s.loadMe);
+	const hasAnyPermission = useAuth((s) => s.hasAnyPermission);
 
 	useEffect(() => {
 		if (!initialized) void loadMe();
@@ -36,6 +37,11 @@ export default function PostPreviewPage() {
 	}
 
 	const p = postQuery.data;
+	const canViewAny = hasAnyPermission(["post:write:any", "post:review"]);
+	const isOwner = user!.id === p.user.id;
+	if (!isOwner && !canViewAny) {
+		return <Centered>Access denied. You do not have permission to preview this post.</Centered>;
+	}
 	const date = p.publishedAt ?? p.updatedAt;
 
 	return (
@@ -79,10 +85,7 @@ export default function PostPreviewPage() {
 					)}
 				</header>
 
-				<div
-					className="tiptap"
-					dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(p.contentHtml) }}
-				/>
+				<div className="tiptap" dangerouslySetInnerHTML={{ __html: sanitizeHtml(p.contentHtml) }} />
 			</article>
 		</div>
 	);
