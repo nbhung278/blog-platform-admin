@@ -34,6 +34,5 @@ export function sanitizeHtml(html: string): string {
 	return DOMPurify.sanitize(html, {
 		ALLOWED_TAGS,
 		ALLOWED_ATTR,
-		ADD_ATTR: ["target", "rel"],
 	});
 }
