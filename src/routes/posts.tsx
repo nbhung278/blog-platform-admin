@@ -107,7 +107,6 @@ function PostsContent() {
 		onSuccess: () => {
 			toast.success("Post deleted");
 			qc.invalidateQueries({ queryKey: ["posts"] });
-			qc.invalidateQueries({ queryKey: ["categories"] });
 			setDeleting(null);
 		},
 		onError: (err: { response?: { data?: { error?: string } } }) =>
@@ -119,7 +118,6 @@ function PostsContent() {
 		onSuccess: (data) => {
 			toast.success(`${data.deleted} post${data.deleted > 1 ? "s" : ""} deleted`);
 			qc.invalidateQueries({ queryKey: ["posts"] });
-			qc.invalidateQueries({ queryKey: ["categories"] });
 			setRowSelection({});
 			setBulkDeleting(false);
 		},
@@ -492,7 +490,20 @@ function PostsContent() {
 				open={bulkDeleting}
 				onOpenChange={(o) => !o && setBulkDeleting(false)}
 				title={`Delete ${selectedIds.length} post${selectedIds.length > 1 ? "s" : ""}?`}
-				description="This permanently deletes all selected posts. This cannot be undone."
+				description={
+					<>
+						<span>This permanently deletes the following posts and cannot be undone:</span>
+						<ul className="mt-2 max-h-40 overflow-y-auto">
+							{rows
+								.filter((r) => selectedIds.includes(r.id))
+								.map((r) => (
+									<li key={r.id} className="truncate text-sm font-medium">
+										• {r.title}
+									</li>
+								))}
+						</ul>
+					</>
+				}
 				confirmLabel="Delete all"
 				destructive
 				loading={bulkRemoveMut.isPending}

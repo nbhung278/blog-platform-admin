@@ -25,11 +25,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { categoriesApi, type Category } from "@/lib/queries";
+import { useAuth } from "@/store/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function CategoriesPage() {
+	const hasPermission = useAuth((s) => s.hasPermission);
 	return (
 		<AppLayout>
-			<CategoriesContent />
+			{hasPermission(PERMISSIONS.ROLE_MANAGE) ? (
+				<CategoriesContent />
+			) : (
+				<div className="text-muted-foreground py-20 text-center text-sm">
+					You don't have permission to manage categories.
+				</div>
+			)}
 		</AppLayout>
 	);
 }

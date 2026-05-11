@@ -27,11 +27,20 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { rolesApi, type Permission, type RoleSummary } from "@/lib/queries";
+import { useAuth } from "@/store/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function RolesPage() {
+	const hasPermission = useAuth((s) => s.hasPermission);
 	return (
 		<AppLayout>
-			<RolesContent />
+			{hasPermission(PERMISSIONS.ROLE_MANAGE) ? (
+				<RolesContent />
+			) : (
+				<div className="text-muted-foreground py-20 text-center text-sm">
+					You don't have permission to manage roles.
+				</div>
+			)}
 		</AppLayout>
 	);
 }
