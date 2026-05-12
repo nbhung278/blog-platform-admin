@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/store/auth";
 import { ADMIN_PANEL_PERMISSIONS } from "@/lib/permissions";
-import { api } from "@/lib/api";
 
 const PUBLIC_PATHS = new Set(["/login", "/setup"]);
 
@@ -11,25 +10,17 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const user = useAuth((s) => s.user);
 	const initialized = useAuth((s) => s.initialized);
+	const setupChecked = useAuth((s) => s.setupChecked);
+	const needsSetup = useAuth((s) => s.needsSetup);
 	const loadMe = useAuth((s) => s.loadMe);
+	const checkSetupStatus = useAuth((s) => s.checkSetupStatus);
 
-	const [setupChecked, setSetupChecked] = useState(false);
-	const [needsSetup, setNeedsSetup] = useState(false);
-
-	// Initial bootstrap: setup-status + loadMe in parallel on mount.
+	// Initial bootstrap: setup-status + loadMe in parallel on first mount only.
+	// Both calls are idempotent in the store (early-return if already done), so
+	// remounting RequireAuth across route changes doesn't re-hit the network.
 	useEffect(() => {
-		(async () => {
-			try {
-				const { data } = await api.get<{ needsSetup: boolean }>("/api/auth/setup-status");
-				setNeedsSetup(data.needsSetup);
-			} catch {
-				setNeedsSetup(false);
-			} finally {
-				setSetupChecked(true);
-			}
-			if (!initialized) await loadMe();
-		})();
-		// Run once on mount.
+		void checkSetupStatus();
+		if (!initialized) void loadMe();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
@@ -45,15 +36,8 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 		}
 		if (!wasLoggedInRef.current) return;
 		wasLoggedInRef.current = false;
-		(async () => {
-			try {
-				const { data } = await api.get<{ needsSetup: boolean }>("/api/auth/setup-status");
-				setNeedsSetup(data.needsSetup);
-			} catch {
-				/* ignore — keep prior state */
-			}
-		})();
-	}, [user]);
+		void checkSetupStatus(true);
+	}, [user, checkSetupStatus]);
 
 	useEffect(() => {
 		if (!setupChecked || !initialized) return;

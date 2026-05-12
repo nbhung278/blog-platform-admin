@@ -31,17 +31,27 @@ import { PasswordRequirements } from "@/components/PasswordRequirements";
 import { isPasswordValid } from "@/lib/password-rules";
 import { rolesApi, usersApi, type AdminUserRow } from "@/lib/queries";
 import { useAuth } from "@/store/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function UsersPage() {
+	const permissions = useAuth((s) => s.user?.permissions);
+	const canView = permissions?.includes(PERMISSIONS.USER_VIEW) ?? false;
 	return (
 		<AppLayout>
-			<UsersContent />
+			{canView ? (
+				<UsersContent />
+			) : (
+				<div className="text-muted-foreground py-20 text-center text-sm">
+					You don't have permission to view users.
+				</div>
+			)}
 		</AppLayout>
 	);
 }
 
 function UsersContent() {
 	const me = useAuth((s) => s.user)!;
+	const canManage = me.permissions.includes(PERMISSIONS.USER_MANAGE);
 	const qc = useQueryClient();
 
 	const usersQuery = useQuery({ queryKey: ["users"], queryFn: usersApi.list });
@@ -69,7 +79,7 @@ function UsersContent() {
 					<h1 className="text-2xl font-semibold">Users</h1>
 					<p className="text-muted-foreground text-sm">Manage users and assign roles.</p>
 				</div>
-				<Button onClick={() => setCreating(true)}>
+				<Button onClick={() => setCreating(true)} disabled={!canManage}>
 					<Plus className="h-4 w-4" />
 					New user
 				</Button>
@@ -120,7 +130,7 @@ function UsersContent() {
 											variant="ghost"
 											size="icon"
 											aria-label="Edit user"
-											title="Edit user"
+											title={canManage ? "Edit user" : "View user"}
 											onClick={() => setEditing(u)}
 										>
 											<Pencil className="h-4 w-4" />
@@ -130,7 +140,7 @@ function UsersContent() {
 											size="icon"
 											aria-label="Delete user"
 											title="Delete user"
-											disabled={u.id === me.id}
+											disabled={u.id === me.id || !canManage}
 											onClick={() => setDeleting(u)}
 										>
 											<Trash2 className="text-destructive h-4 w-4" />

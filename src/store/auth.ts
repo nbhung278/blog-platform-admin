@@ -18,6 +18,10 @@ type AuthState = {
 	user: AdminUser | null;
 	loading: boolean;
 	initialized: boolean;
+	// Cached result of /api/auth/setup-status so it's only fetched once per
+	// page-load instead of every time a route mounts RequireAuth.
+	setupChecked: boolean;
+	needsSetup: boolean;
 	login: (email: string, password: string) => Promise<void>;
 	setup: (data: {
 		email: string;
@@ -27,6 +31,7 @@ type AuthState = {
 	}) => Promise<void>;
 	logout: () => Promise<void>;
 	loadMe: () => Promise<void>;
+	checkSetupStatus: (force?: boolean) => Promise<void>;
 	hasPermission: (perm: PermissionKey) => boolean;
 	hasAnyPermission: (perms: PermissionKey[]) => boolean;
 };
@@ -35,6 +40,8 @@ export const useAuth = create<AuthState>((set, get) => ({
 	user: null,
 	loading: false,
 	initialized: false,
+	setupChecked: false,
+	needsSetup: false,
 
 	async login(email, password) {
 		set({ loading: true });
@@ -91,6 +98,19 @@ export const useAuth = create<AuthState>((set, get) => ({
 			}
 		} finally {
 			set({ loading: false });
+		}
+	},
+
+	async checkSetupStatus(force = false) {
+		if (!force && get().setupChecked) return;
+		try {
+			const { data } = await api.get<{ needsSetup: boolean }>("/api/auth/setup-status");
+			set({ needsSetup: data.needsSetup, setupChecked: true });
+		} catch {
+			// Backend offline → assume no setup needed so we don't trap the user
+			// on /setup. RequireAuth will redirect to /login and the next request
+			// will surface the real connectivity error.
+			set({ setupChecked: true });
 		}
 	},
 

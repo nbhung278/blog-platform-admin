@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/store/auth";
 import { ADMIN_PANEL_PERMISSIONS } from "@/lib/permissions";
-import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -12,21 +11,21 @@ export default function LoginPage() {
 	const navigate = useNavigate();
 	const login = useAuth((s) => s.login);
 	const loading = useAuth((s) => s.loading);
+	const checkSetupStatus = useAuth((s) => s.checkSetupStatus);
+	const needsSetup = useAuth((s) => s.needsSetup);
+	const setupChecked = useAuth((s) => s.setupChecked);
 
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
-		(async () => {
-			try {
-				const { data } = await api.get<{ needsSetup: boolean }>("/api/auth/setup-status");
-				if (data.needsSetup) navigate({ to: "/setup" });
-			} catch {
-				// ignore — backend offline, leave user on login
-			}
-		})();
-	}, [navigate]);
+		void checkSetupStatus();
+	}, [checkSetupStatus]);
+
+	useEffect(() => {
+		if (setupChecked && needsSetup) navigate({ to: "/setup" });
+	}, [setupChecked, needsSetup, navigate]);
 
 	async function onSubmit(e: FormEvent) {
 		e.preventDefault();

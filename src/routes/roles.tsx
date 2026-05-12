@@ -31,14 +31,15 @@ import { useAuth } from "@/store/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 
 export default function RolesPage() {
-	const hasPermission = useAuth((s) => s.hasPermission);
+	const permissions = useAuth((s) => s.user?.permissions);
+	const canView = permissions?.includes(PERMISSIONS.ROLE_VIEW) ?? false;
 	return (
 		<AppLayout>
-			{hasPermission(PERMISSIONS.ROLE_MANAGE) ? (
+			{canView ? (
 				<RolesContent />
 			) : (
 				<div className="text-muted-foreground py-20 text-center text-sm">
-					You don't have permission to manage roles.
+					You don't have permission to view roles.
 				</div>
 			)}
 		</AppLayout>
@@ -47,6 +48,8 @@ export default function RolesPage() {
 
 function RolesContent() {
 	const qc = useQueryClient();
+	const permissions = useAuth((s) => s.user?.permissions);
+	const canManage = permissions?.includes(PERMISSIONS.ROLE_MANAGE) ?? false;
 	const rolesQuery = useQuery({ queryKey: ["roles"], queryFn: rolesApi.list });
 	const permsQuery = useQuery({
 		queryKey: ["roles", "permissions"],
@@ -77,7 +80,7 @@ function RolesContent() {
 						Define roles and the permissions they grant.
 					</p>
 				</div>
-				<Button onClick={() => setCreating(true)}>
+				<Button onClick={() => setCreating(true)} disabled={!canManage}>
 					<Plus className="h-4 w-4" />
 					New role
 				</Button>
@@ -142,7 +145,7 @@ function RolesContent() {
 											variant="ghost"
 											size="icon"
 											aria-label="Edit role"
-											title="Edit role"
+											title={canManage ? "Edit role" : "View role"}
 											onClick={() => setEditing(r)}
 										>
 											<Pencil className="h-4 w-4" />
@@ -152,7 +155,7 @@ function RolesContent() {
 											size="icon"
 											aria-label="Delete role"
 											title="Delete role"
-											disabled={r.isSystem}
+											disabled={r.isSystem || !canManage}
 											onClick={() => setDeleting(r)}
 										>
 											<Trash2 className="text-destructive h-4 w-4" />

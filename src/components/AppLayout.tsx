@@ -27,10 +27,10 @@ const NAV: NavItem[] = [
 		to: "/categories",
 		label: "Categories",
 		icon: Tag,
-		requiresAny: [PERMISSIONS.ROLE_MANAGE, PERMISSIONS.POST_WRITE_ANY],
+		requires: PERMISSIONS.CATEGORY_MANAGE,
 	},
-	{ to: "/users", label: "Users", icon: Users, requires: PERMISSIONS.USER_MANAGE },
-	{ to: "/roles", label: "Roles", icon: ShieldCheck, requires: PERMISSIONS.ROLE_MANAGE },
+	{ to: "/users", label: "Users", icon: Users, requires: PERMISSIONS.USER_VIEW },
+	{ to: "/roles", label: "Roles", icon: ShieldCheck, requires: PERMISSIONS.ROLE_VIEW },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {

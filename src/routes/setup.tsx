@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ShieldCheck } from "lucide-react";
 import { useAuth } from "@/store/auth";
-import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -15,8 +14,11 @@ export default function SetupPage() {
 	const navigate = useNavigate();
 	const setup = useAuth((s) => s.setup);
 	const loading = useAuth((s) => s.loading);
+	const checkSetupStatus = useAuth((s) => s.checkSetupStatus);
+	const setupChecked = useAuth((s) => s.setupChecked);
+	const needsSetup = useAuth((s) => s.needsSetup);
+	const allowed = setupChecked ? needsSetup : null;
 
-	const [allowed, setAllowed] = useState<boolean | null>(null);
 	const [name, setName] = useState("");
 	const [username, setUsername] = useState("");
 	const [email, setEmail] = useState("");
@@ -25,16 +27,12 @@ export default function SetupPage() {
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
-		(async () => {
-			try {
-				const { data } = await api.get<{ needsSetup: boolean }>("/api/auth/setup-status");
-				setAllowed(data.needsSetup);
-				if (!data.needsSetup) navigate({ to: "/login" });
-			} catch {
-				setAllowed(false);
-			}
-		})();
-	}, [navigate]);
+		void checkSetupStatus();
+	}, [checkSetupStatus]);
+
+	useEffect(() => {
+		if (setupChecked && !needsSetup) navigate({ to: "/login" });
+	}, [setupChecked, needsSetup, navigate]);
 
 	async function onSubmit(e: FormEvent) {
 		e.preventDefault();

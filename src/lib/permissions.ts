@@ -1,4 +1,5 @@
 export const PERMISSIONS = {
+	POST_VIEW_ANY: "post:view:any",
 	POST_WRITE_OWN: "post:write:own",
 	POST_WRITE_ANY: "post:write:any",
 	POST_PUBLISH_ANY: "post:publish:any",
@@ -9,7 +10,10 @@ export const PERMISSIONS = {
 	COMMENT_MODERATE: "comment:moderate",
 	COMMENT_DELETE_ANY: "comment:delete:any",
 	ANALYTICS_VIEW: "analytics:view",
+	CATEGORY_MANAGE: "category:manage",
+	USER_VIEW: "user:view",
 	USER_MANAGE: "user:manage",
+	ROLE_VIEW: "role:view",
 	ROLE_MANAGE: "role:manage",
 } as const;
 
@@ -17,13 +21,17 @@ export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 // User must have at least one of these to access the admin panel.
 export const ADMIN_PANEL_PERMISSIONS: PermissionKey[] = [
+	PERMISSIONS.POST_VIEW_ANY,
 	PERMISSIONS.POST_WRITE_OWN,
 	PERMISSIONS.POST_WRITE_ANY,
 	PERMISSIONS.POST_PUBLISH_ANY,
 	PERMISSIONS.POST_REVIEW,
 	PERMISSIONS.COMMENT_MODERATE,
 	PERMISSIONS.ANALYTICS_VIEW,
+	PERMISSIONS.CATEGORY_MANAGE,
+	PERMISSIONS.USER_VIEW,
 	PERMISSIONS.USER_MANAGE,
+	PERMISSIONS.ROLE_VIEW,
 	PERMISSIONS.ROLE_MANAGE,
 ];
 

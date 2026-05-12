@@ -29,10 +29,11 @@ import { useAuth } from "@/store/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 
 export default function CategoriesPage() {
-	const hasPermission = useAuth((s) => s.hasPermission);
+	const permissions = useAuth((s) => s.user?.permissions);
+	const allowed = permissions?.includes(PERMISSIONS.CATEGORY_MANAGE) ?? false;
 	return (
 		<AppLayout>
-			{hasPermission(PERMISSIONS.ROLE_MANAGE) ? (
+			{allowed ? (
 				<CategoriesContent />
 			) : (
 				<div className="text-muted-foreground py-20 text-center text-sm">
