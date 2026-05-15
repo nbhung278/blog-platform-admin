@@ -10,9 +10,14 @@ import PostsPage from "./posts";
 import { PostNewPage, PostEditPage } from "./post-editor";
 import PostPreviewPage from "./post-preview";
 import CategoriesPage from "./categories";
+import NotFoundPage from "./not-found";
 
 const rootRoute = createRootRoute({
 	component: App,
+	// Without this, mistyped admin URLs render an empty Outlet under the
+	// AppLayout chrome — looks broken. Show an explicit 404 with a back-to-
+	// dashboard link instead.
+	notFoundComponent: NotFoundPage,
 });
 
 const indexRoute = createRoute({
