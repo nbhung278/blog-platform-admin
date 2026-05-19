@@ -44,10 +44,21 @@ import {
 	Rows3,
 	Columns3,
 	Film,
+	Braces,
 } from "lucide-react";
 import { toast } from "sonner";
 import { uploadsApi } from "@/lib/queries";
 import { cn } from "@/lib/utils";
+import { sanitizeHtml } from "@/lib/sanitize";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 type Props = {
 	value: string;
@@ -88,7 +99,7 @@ export function PostEditor({ value, onChange, placeholder }: Props) {
 			Link.configure({
 				openOnClick: false,
 				autolink: true,
-				HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
+				HTMLAttributes: { rel: "nofollow noopener noreferrer sponsored", target: "_blank" },
 			}),
 			Placeholder.configure({ placeholder: placeholder ?? "Bắt đầu viết..." }),
 			Highlight.configure({ multicolor: false }),
@@ -440,6 +451,7 @@ function MainToolbar({
 			<TbBtn onClick={onInsertYoutube} title="Embed YouTube video">
 				<Film className="size-4" />
 			</TbBtn>
+			<InsertHtmlButton editor={editor} />
 			<TableMenu editor={editor} />
 
 			<Sep />
@@ -825,4 +837,47 @@ function TbBtn({
 
 function Sep() {
 	return <div className="bg-border mx-1 h-6 w-px" />;
+}
+
+function InsertHtmlButton({ editor }: { editor: Editor }) {
+	const [open, setOpen] = useState(false);
+	const [raw, setRaw] = useState("");
+
+	function handleInsert() {
+		if (!raw.trim()) return;
+		const clean = sanitizeHtml(raw);
+		editor.chain().focus().insertContent(clean).run();
+		setRaw("");
+		setOpen(false);
+	}
+
+	return (
+		<>
+			<TbBtn onClick={() => setOpen(true)} title="Insert HTML">
+				<Braces className="size-4" />
+			</TbBtn>
+			<Dialog open={open} onOpenChange={setOpen}>
+				<DialogContent className="max-w-lg">
+					<DialogHeader>
+						<DialogTitle>Insert HTML</DialogTitle>
+					</DialogHeader>
+					<Textarea
+						value={raw}
+						onChange={(e) => setRaw(e.target.value)}
+						placeholder="Paste your HTML here..."
+						className="font-mono text-sm"
+						rows={8}
+					/>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setOpen(false)}>
+							Cancel
+						</Button>
+						<Button onClick={handleInsert} disabled={!raw.trim()}>
+							Insert
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</>
+	);
 }
