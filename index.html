@@ -11,9 +11,17 @@
 			(meta cannot). connect-src must include the backend origin — adjust
 			when deploying to a different domain.
 		-->
+		<!--
+			img-src was previously `https:` (any HTTPS host). Tightened to the
+			specific origins admin actually loads images from: 'self' for
+			favicons, data:/blob: for FileReader previews in the editor, the
+			S3 bucket + CDN for user-uploaded media, and Google avatars for
+			users created via OAuth on the public site (backend writes the
+			Google picture URL into avatarUrl on signup).
+		-->
 		<meta
 			http-equiv="Content-Security-Policy"
-			content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' http://localhost:3000 ws://localhost:* https://api.strix-blog.uk wss://api.strix-blog.uk https://strix-blog-media.s3.ap-southeast-1.amazonaws.com; object-src 'none'; base-uri 'self'; form-action 'self'"
+			content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://cdn.strix-blog.uk https://strix-blog-media.s3.ap-southeast-1.amazonaws.com https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://api.strix-blog.uk wss://api.strix-blog.uk https://strix-blog-media.s3.ap-southeast-1.amazonaws.com; object-src 'none'; base-uri 'self'; form-action 'self'"
 		/>
 		<title>Blog Platform Admin</title>
 	</head>

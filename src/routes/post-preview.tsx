@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useAuth } from "@/store/auth";
 import { postsApi } from "@/lib/queries";
-import { sanitizeHtml } from "@/lib/sanitize";
+import { sanitizeHtml, safeImageUrl } from "@/lib/sanitize";
 import { Badge } from "@/components/ui/badge";
 
 export default function PostPreviewPage() {
@@ -56,13 +56,20 @@ export default function PostPreviewPage() {
 			</div>
 
 			<article className="mx-auto max-w-3xl px-6 py-12">
-				{p.coverUrl && (
-					<img
-						src={p.coverUrl}
-						alt=""
-						className="mb-8 aspect-video w-full rounded-lg object-cover"
-					/>
-				)}
+				{(() => {
+					// Defence-in-depth: backend's isAllowedMediaUrl already constrains
+					// coverUrl at write time, but pipe it through safeImageUrl here so
+					// a future regression (or a hand-edited DB row) can't render an
+					// attacker-controlled <img src>.
+					const cover = safeImageUrl(p.coverUrl);
+					return cover ? (
+						<img
+							src={cover}
+							alt={p.title}
+							className="mb-8 aspect-video w-full rounded-lg object-cover"
+						/>
+					) : null;
+				})()}
 
 				<header className="mb-8 space-y-3">
 					<div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">

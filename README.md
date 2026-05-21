@@ -1,105 +1,90 @@
 # Strix — Admin Panel
 
-The moderation/operations SPA for the Strix blog platform. Lets staff manage users, roles, posts (review/approve/reject), and categories.
+SPA admin/moderation cho Strix blog. Manage users, roles, posts (review/approve/reject), categories.
 
-## Stack
+**Stack**: React 19 + Vite + TanStack Router/Query + TanStack Table + Zustand + shadcn/ui + Tailwind 4 + TipTap.
 
-- **React 19** + **Vite**
-- **TanStack Router** + **TanStack Query**
-- **Zustand** for auth state
-- **shadcn/ui** components on **Tailwind CSS**
-- **TanStack Table** for post list
-- **Tiptap** for the same editor experience as the public client
-- **Sonner** for toasts (single global Toaster in `App.tsx`)
+> Đọc [../CLAUDE.md](../CLAUDE.md) ở root project để nắm overview kiến trúc, cookie protocol, deploy workflow.
 
-## Features
-
-- Setup wizard: bootstrap the first super-admin when the database has zero users
-- Login + auto-refresh + permission-aware navigation
-- **Posts**: list with filters/tabs (All / My posts / Pending review), inline approve/reject, edit with the same Tiptap editor authors use
-- **Users**: create, edit (assign roles, force-password-change flag), delete
-- **Roles**: CRUD with permission checkboxes, system roles protected from deletion
-- **Categories**: CRUD; deletion blocked when posts are still assigned
-- Sidebar navigation gated by RBAC — buttons only render if the current user has the relevant permission
-
-## Prerequisites
-
-- [Bun](https://bun.sh/) ≥ 1.2
-- Backend running and reachable
-
-## Setup
+## Quick start
 
 ```bash
+# Prerequisites: Bun ≥ 1.2, backend running
+
 bun install
-
-cp .env.example .env
-# VITE_API_URL=http://localhost:3000  (admin uses /api/* paths, hardcoded in lib/api.ts)
-
-bun run dev
+cp .env.example .env      # VITE_API_URL=http://localhost:3000
+bun run dev               # http://localhost:5174
 ```
 
-Default dev URL: <http://localhost:5174>.
+**First-time bootstrap**: khi DB empty, admin panel hiện setup wizard ở `/` → tạo super_admin đầu (POST `/api/auth/setup`, idempotent). Sau đó login ở `/login`.
 
 ## Scripts
 
-| Command | What it does |
-|---|---|
-| `bun run dev` | Vite dev server with HMR |
+| Command | What |
+| --- | --- |
+| `bun run dev` | Vite dev server (CSP meta tự strip qua plugin) |
 | `bun run build` | Type-check + production bundle |
-| `bun run preview` | Preview production build locally |
-| `bun run lint` | ESLint |
-
-## First-time bootstrap
-
-When the database has zero users, the admin panel shows a setup wizard at `/` that lets you create the first super-admin (calls `POST /api/auth/setup`, which is idempotent and only allowed while the user count is zero). After that, sign-in is at `/login`.
-
-## Architecture notes
-
-- **Cookie partitioning**: admin sends `X-App-Client: admin`. Backend partitions cookies (`admin_at`, `admin_rt`, `admin_csrf`) so admin and the public client can be logged into different accounts simultaneously without clobbering each other's sessions.
-- **Auto-refresh**: `src/lib/api.ts` interceptor handles 401 by calling `/api/auth/refresh` once (single-flight), retrying the original request. If refresh fails, `registerOnAuthLost` clears auth state and dumps the React Query cache.
-- **CSRF**: cached in module scope, invalidated on login / setup / refresh / logout / 403 CSRF mismatch.
-- **Permission gating**: `src/lib/permissions.ts` mirrors the backend's permission keys. UI uses `useAuth().hasPermission()` to hide actions the current user can't perform — the backend re-enforces them anyway.
-- **Cache hygiene**: `queryClient.clear()` is called on login, setup, logout, and auth-lost events so a stale view from another account never leaks across sessions.
+| `bun run check` | tsc + eslint + prettier check |
 
 ## Project layout
 
 ```
 src/
-  main.tsx                   # mount QueryClientProvider + RouterProvider
-  App.tsx                    # render <Outlet/> + global Toaster
+  main.tsx                   # QueryClientProvider + RouterProvider
+  App.tsx                    # <Outlet/> + global Toaster
   lib/
-    api.ts                   # axios + interceptors (auth lost / CSRF)
-    queryClient.ts           # shared QueryClient instance
-    queries.ts               # API surface (categoriesApi, postsApi, etc.)
-    permissions.ts           # PERMISSIONS constants + helpers
-    password-rules.ts
-    authConstants.ts
-    markdown.ts utils.ts
-  store/auth.ts              # zustand auth store + loadMe + RBAC helpers
+    api.ts                   # axios + auto-refresh + CSRF inject
+    authConstants.ts         # ⚠ KEEP IN SYNC với backend cookies.ts + frontend
+    sanitize.ts              # sanitizeHtml + safeImageUrl (KEEP IN SYNC với frontend)
+    permissions.ts           # mirror backend's PERMISSIONS constants
+    queries.ts               # API surface (postsApi, usersApi, rolesApi, ...)
+    queryClient.ts password-rules.ts markdown.ts utils.ts
+  store/auth.ts              # zustand + loadMe single-flight + checkSetupStatus + hasPermission helpers
   components/
     AppLayout.tsx            # sidebar shell, nav gated by RBAC
-    RequireAuth.tsx          # auth + setup-status guard
-    ConfirmDialog.tsx        # reusable confirm modal
-    PasswordRequirements.tsx
-    editor/                  # Tiptap wrapper (mirrors the public client)
-    ui/                      # shadcn/ui components
+    RequireAuth.tsx          # auth + setup-status + must-change-password guard
+    editor/PostEditor.tsx    # TipTap wrapper (giống frontend's, dùng shadcn UI)
+    ui/                      # shadcn/ui (badge.tsx và button.tsx có react-refresh warning — boilerplate, skip)
+    ConfirmDialog.tsx PasswordRequirements.tsx ErrorBoundary.tsx
   routes/
     index.tsx                # routeTree
-    setup.tsx login.tsx
-    posts.tsx                # /posts list with tabs and review actions
-    post-editor.tsx          # /posts/new and /posts/:id/edit
-    users.tsx roles.tsx categories.tsx
+    home.tsx setup.tsx login.tsx change-password.tsx
+    posts.tsx                # /posts list với tabs (Mine/All/Review)
+    post-editor.tsx          # /posts/new và /posts/:id/edit
+    post-preview.tsx         # /posts/:id/preview (có dangerouslySetInnerHTML qua sanitizeHtml)
+    users.tsx roles.tsx categories.tsx not-found.tsx
+vite.config.ts               # có stripCspInDev plugin
 ```
 
-## Deploying
+## Key patterns
 
-- `bun run build` → static site in `dist/`
-- Hosted on AWS S3 + CloudFront (see `../scripts/DEPLOY.md`)
-- `./scripts/deploy-admin.sh` handles build + S3 sync + CloudFront invalidation
-- Same SPA-fallback rules as the public client
-- `VITE_API_URL` baked in at build time — must point at the production API origin
-- Backend must include the deployed admin URL in `ADMIN_URL` so CORS + WebSocket origin checks pass
+- **Cookie partitioning**: admin sends `X-App-Client: admin`. Backend dùng `admin_at`, `admin_rt`, `admin_csrf` (khác `web_*` của frontend) → user có thể login đồng thời 2 app khác account.
+- **Permission gating**: `useAuth().hasPermission(...)` ẩn UI nếu user không đủ quyền. Backend re-enforce hết — UI gate chỉ là UX, không phải security boundary.
+- **Cache hygiene**: `queryClient.clear()` gọi sau login/setup/logout/auth-lost để không leak data giữa accounts.
+- **Auto-refresh**: same pattern frontend — interceptor 401 → `/api/auth/refresh` single-flight → retry. Fail → `onAuthLost` → null state.
 
-## Roadmap
+## Permission model
 
-See `ROADMAP.md` for performance/UX improvements applied across the platform — most done as of 2026-05-08.
+17 keys (xem `src/lib/permissions.ts`):
+- `post:*` (view:any, write:own, write:any, publish:any, delete:own, delete:any, review)
+- `media:upload`
+- `comment:moderate`, `comment:delete:any`
+- `analytics:view`, `category:manage`
+- `user:view`, `user:manage`, `role:view`, `role:manage`
+
+3 default roles seed sẵn ở backend:
+- `super_admin` — tất cả 17 permissions. Cannot be modified by non-super_admin (PATCH/DELETE block).
+- `admin` — content + moderation
+- `author` — own posts + media upload
+
+Login admin panel cần ít nhất 1 permission từ `ADMIN_PANEL_PERMISSIONS` (xem `src/lib/permissions.ts`).
+
+## Deploy
+
+Xem [../scripts/DEPLOY.md](../scripts/DEPLOY.md). Build → S3 `strix-blog-admin` → CloudFront → `admin.strix-blog.uk`.
+
+```bash
+./scripts/deploy-admin.sh   # build + S3 sync + CloudFront invalidate + smoke test
+```
+
+Backend phải include URL deployed trong `ADMIN_URL` (CORS + WS origin allowlist).

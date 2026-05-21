@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { postsApi, categoriesApi, uploadsApi, type PostStatus } from "@/lib/queries";
 import { htmlToMarkdown } from "@/lib/markdown";
 import { PERMISSIONS, POST_WRITE_PERMISSIONS } from "@/lib/permissions";
+import { safeImageUrl } from "@/lib/sanitize";
 import { useAuth } from "@/store/auth";
 
 // Mirrors the backend cap in posts.ts; keep them in sync.
@@ -328,22 +329,29 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 							</div>
 							<div className="space-y-1.5">
 								<Label>Cover image</Label>
-								{coverUrl && (
-									<div className="relative">
-										<img
-											src={coverUrl}
-											alt="Cover preview"
-											className="aspect-video w-full rounded object-cover"
-										/>
-										<button
-											type="button"
-											onClick={() => setCoverUrl("")}
-											className="absolute top-1 right-1 rounded bg-black/50 p-1 text-white hover:bg-black/70"
-										>
-											<X className="h-3 w-3" />
-										</button>
-									</div>
-								)}
+								{(() => {
+									// User pastes the URL into the input below; gate the preview
+									// through safeImageUrl so `javascript:` / relative inputs never
+									// reach the DOM. Backend re-validates on save via the media
+									// allowlist; this is the editor-side defence.
+									const previewSrc = safeImageUrl(coverUrl);
+									return previewSrc ? (
+										<div className="relative">
+											<img
+												src={previewSrc}
+												alt="Cover preview"
+												className="aspect-video w-full rounded object-cover"
+											/>
+											<button
+												type="button"
+												onClick={() => setCoverUrl("")}
+												className="absolute top-1 right-1 rounded bg-black/50 p-1 text-white hover:bg-black/70"
+											>
+												<X className="h-3 w-3" />
+											</button>
+										</div>
+									) : null;
+								})()}
 								<div className="flex gap-2">
 									<Input
 										value={coverUrl}
