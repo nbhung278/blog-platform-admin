@@ -81,6 +81,8 @@ const TEXT_COLORS = [
 export function PostEditor({ value, onChange, placeholder }: Props) {
 	const uploadingRef = useRef(false);
 	const mountedRef = useRef(true);
+	const [imageDialogOpen, setImageDialogOpen] = useState(false);
+	const [imageUrl, setImageUrl] = useState("");
 
 	useEffect(() => {
 		mountedRef.current = true;
@@ -136,6 +138,12 @@ export function PostEditor({ value, onChange, placeholder }: Props) {
 						}
 					}
 				}
+				const text = event.clipboardData?.getData("text/plain")?.trim();
+				if (text && isImageUrl(text)) {
+					event.preventDefault();
+					void uploadUrlAndInsert(text);
+					return true;
+				}
 				return false;
 			},
 			handleDrop: (_view, event) => {
@@ -159,6 +167,62 @@ export function PostEditor({ value, onChange, placeholder }: Props) {
 			editor.commands.setContent(value || "", { emitUpdate: false });
 		}
 	}, [editor, value]);
+
+	const ownMediaHosts = new Set(
+		(import.meta.env.VITE_MEDIA_HOSTS ?? "")
+			.split(",")
+			.map((h: string) => h.trim().toLowerCase())
+			.filter(Boolean),
+	);
+
+	function isImageUrl(text: string): boolean {
+		try {
+			const url = new URL(text);
+			if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+			const ext = url.pathname.split(".").pop()?.toLowerCase() ?? "";
+			return ["jpg", "jpeg", "png", "webp", "gif", "avif"].includes(ext);
+		} catch {
+			return false;
+		}
+	}
+
+	function isOwnMediaUrl(text: string): boolean {
+		try {
+			return ownMediaHosts.has(new URL(text).hostname.toLowerCase());
+		} catch {
+			return false;
+		}
+	}
+
+	async function uploadUrlAndInsert(url: string) {
+		if (!editor) return;
+		if (isOwnMediaUrl(url)) {
+			editor.chain().focus().setImage({ src: url }).run();
+			return;
+		}
+		uploadingRef.current = true;
+		const id = toast.loading("Fetching image...");
+		try {
+			const { url: cdnUrl } = await uploadsApi.uploadFromUrl(url);
+			if (!mountedRef.current || editor.isDestroyed) {
+				toast.dismiss(id);
+				return;
+			}
+			editor.chain().focus().setImage({ src: cdnUrl }).run();
+			toast.success("Image uploaded", { id });
+		} catch (err: unknown) {
+			if (!mountedRef.current) {
+				toast.dismiss(id);
+				return;
+			}
+			const msg =
+				(err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+				"Upload failed";
+			toast.error(msg, { id });
+		} finally {
+			uploadingRef.current = false;
+		}
+	}
 
 	async function uploadAndInsert(file: File) {
 		if (!editor) return;
@@ -186,6 +250,11 @@ export function PostEditor({ value, onChange, placeholder }: Props) {
 		}
 	}
 
+	function openImageDialog() {
+		setImageUrl("");
+		setImageDialogOpen(true);
+	}
+
 	function pickAndUpload() {
 		const input = document.createElement("input");
 		input.type = "file";
@@ -196,6 +265,14 @@ export function PostEditor({ value, onChange, placeholder }: Props) {
 			input.onchange = null;
 		};
 		input.click();
+	}
+
+	function handleImageUrlInsert() {
+		const trimmed = imageUrl.trim();
+		if (!trimmed) return;
+		setImageDialogOpen(false);
+		setImageUrl("");
+		void uploadUrlAndInsert(trimmed);
 	}
 
 	function setLink() {
@@ -241,47 +318,87 @@ export function PostEditor({ value, onChange, placeholder }: Props) {
 	if (!editor) return null;
 
 	return (
-		<div className="overflow-hidden rounded-md border">
-			<MainToolbar
-				editor={editor}
-				onPickImage={pickAndUpload}
-				onSetLink={setLink}
-				onInsertYoutube={insertYoutube}
-				uploadingRef={uploadingRef}
-			/>
-			<div className="p-4">
-				<BubbleMenu
+		<>
+			<div className="overflow-hidden rounded-md border">
+				<MainToolbar
 					editor={editor}
-					className="tiptap-bubble-menu"
-					shouldShow={({ editor, from, to }) => {
-						if (from === to) return false;
-						if (editor.isActive("image")) return false;
-						return true;
-					}}
-				>
-					<InlineFormatButtons editor={editor} onSetLink={setLink} />
-				</BubbleMenu>
-
-				<FloatingMenu
-					editor={editor}
-					className="tiptap-floating-menu"
-					shouldShow={({ editor }) => {
-						const { $from } = editor.state.selection;
-						const isEmpty = $from.parent.content.size === 0;
-						const isParagraph = $from.parent.type.name === "paragraph";
-						return isEmpty && isParagraph;
-					}}
-				>
-					<FloatingInsertMenu
+					onPickImage={openImageDialog}
+					onSetLink={setLink}
+					onInsertYoutube={insertYoutube}
+					uploadingRef={uploadingRef}
+				/>
+				<div className="p-4">
+					<BubbleMenu
 						editor={editor}
-						onPickImage={pickAndUpload}
-						uploadingRef={uploadingRef}
-					/>
-				</FloatingMenu>
+						className="tiptap-bubble-menu"
+						shouldShow={({ editor, from, to }) => {
+							if (from === to) return false;
+							if (editor.isActive("image")) return false;
+							return true;
+						}}
+					>
+						<InlineFormatButtons editor={editor} onSetLink={setLink} />
+					</BubbleMenu>
 
-				<EditorContent editor={editor} />
+					<FloatingMenu
+						editor={editor}
+						className="tiptap-floating-menu"
+						shouldShow={({ editor }) => {
+							const { $from } = editor.state.selection;
+							const isEmpty = $from.parent.content.size === 0;
+							const isParagraph = $from.parent.type.name === "paragraph";
+							return isEmpty && isParagraph;
+						}}
+					>
+						<FloatingInsertMenu
+							editor={editor}
+							onPickImage={openImageDialog}
+							uploadingRef={uploadingRef}
+						/>
+					</FloatingMenu>
+
+					<EditorContent editor={editor} />
+				</div>
 			</div>
-		</div>
+
+			<Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle>Insert image</DialogTitle>
+					</DialogHeader>
+					<div className="flex flex-col gap-4">
+						<div className="flex gap-2">
+							<input
+								type="url"
+								value={imageUrl}
+								onChange={(e) => setImageUrl(e.target.value)}
+								onKeyDown={(e) => e.key === "Enter" && handleImageUrlInsert()}
+								placeholder="https://example.com/image.jpg"
+								className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm focus-visible:ring-1 focus-visible:outline-none"
+								autoFocus
+							/>
+							<Button onClick={handleImageUrlInsert} disabled={!imageUrl.trim()}>
+								Insert
+							</Button>
+						</div>
+						<div className="relative flex items-center">
+							<div className="flex-1 border-t" />
+							<span className="text-muted-foreground mx-3 text-xs">or</span>
+							<div className="flex-1 border-t" />
+						</div>
+						<Button
+							variant="outline"
+							onClick={() => {
+								setImageDialogOpen(false);
+								pickAndUpload();
+							}}
+						>
+							Upload from computer
+						</Button>
+					</div>
+				</DialogContent>
+			</Dialog>
+		</>
 	);
 }
 
