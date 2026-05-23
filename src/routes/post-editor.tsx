@@ -109,6 +109,7 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 		}
 		if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
 		e.preventDefault();
+		const prevUrl = coverUrl;
 		setCoverUrl(text);
 		setUploading(true);
 		const toastId = toast.loading("Uploading cover image…");
@@ -120,6 +121,7 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 			const apiErr = err as { response?: { data?: { error?: unknown } } };
 			const detail = formatApiError(apiErr.response?.data?.error) ?? "Could not fetch image";
 			toast.error(`Cover image: ${detail}`, { id: toastId });
+			setCoverUrl(prevUrl);
 		} finally {
 			setUploading(false);
 		}

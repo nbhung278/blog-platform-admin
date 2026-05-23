@@ -129,13 +129,8 @@ function CategoriesContent() {
 										<Button
 											variant="ghost"
 											size="icon"
-											disabled={cat.postCount > 0}
 											aria-label="Delete category"
-											title={
-												cat.postCount > 0
-													? `Cannot delete: ${cat.postCount} post(s) assigned`
-													: "Delete category"
-											}
+											title="Delete category"
 											onClick={() => setDeleting(cat)}
 										>
 											<Trash2 className="text-destructive h-4 w-4" />
@@ -160,15 +155,15 @@ function CategoriesContent() {
 				title="Delete category?"
 				description={
 					deleting && (
-						<span className="space-y-1">
+						<span className="space-y-2">
 							<span className="block">
 								Permanently delete <b>{deleting.name}</b>?
 							</span>
 							{deleting.postCount > 0 ? (
-								<span className="text-destructive block text-sm">
-									Cannot delete: {deleting.postCount} post
-									{deleting.postCount > 1 ? "s are" : " is"} still assigned to this category.
-									Reassign them first.
+								<span className="text-destructive block text-sm font-medium">
+									Warning: {deleting.postCount} post
+									{deleting.postCount > 1 ? "s" : ""} in this category will also be permanently
+									deleted. This cannot be undone.
 								</span>
 							) : (
 								<span className="block text-sm">This cannot be undone.</span>
@@ -179,7 +174,6 @@ function CategoriesContent() {
 				confirmLabel="Delete category"
 				destructive
 				loading={removeMut.isPending}
-				confirmDisabled={!!deleting && deleting.postCount > 0}
 				onConfirm={() => deleting && removeMut.mutate(deleting.id)}
 			/>
 		</div>
