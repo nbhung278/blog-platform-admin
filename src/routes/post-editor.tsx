@@ -99,6 +99,32 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 		}
 	}
 
+	async function handleCoverUrlPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+		const text = e.clipboardData.getData("text").trim();
+		let parsed: URL;
+		try {
+			parsed = new URL(text);
+		} catch {
+			return;
+		}
+		if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
+		e.preventDefault();
+		setCoverUrl(text);
+		setUploading(true);
+		const toastId = toast.loading("Uploading cover image…");
+		try {
+			const { url } = await uploadsApi.uploadFromUrl(text);
+			setCoverUrl(url);
+			toast.success("Cover image uploaded", { id: toastId });
+		} catch (err: unknown) {
+			const apiErr = err as { response?: { data?: { error?: unknown } } };
+			const detail = formatApiError(apiErr.response?.data?.error) ?? "Could not fetch image";
+			toast.error(`Cover image: ${detail}`, { id: toastId });
+		} finally {
+			setUploading(false);
+		}
+	}
+
 	useEffect(() => {
 		if (mode === "edit" && postQuery.data) {
 			const p = postQuery.data;
@@ -356,6 +382,7 @@ function EditorScreen({ mode, postId }: { mode: "new" | "edit"; postId?: string 
 									<Input
 										value={coverUrl}
 										onChange={(e) => setCoverUrl(e.target.value)}
+										onPaste={handleCoverUrlPaste}
 										placeholder="https://..."
 										className="flex-1"
 									/>
